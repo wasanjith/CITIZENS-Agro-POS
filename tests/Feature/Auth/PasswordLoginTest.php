@@ -18,6 +18,15 @@ test('users sign in with username and password', function () {
     expect($user->fresh()->last_login_at)->not->toBeNull();
 });
 
+test('each sign-in writes exactly one audit record', function () {
+    $user = userWithRole(Role::Manager, ['username' => 'nimal']);
+
+    $this->post(route('login'), ['username' => 'nimal', 'password' => 'password']);
+
+    expect(Activity::where('event', 'login')->where('causer_id', $user->id)->count())->toBe(1)
+        ->and(Activity::where('event', 'login')->first()->properties['method'])->toBe('password');
+});
+
 test('a wrong password is rejected', function () {
     userWithRole(Role::Manager, ['username' => 'nimal']);
 

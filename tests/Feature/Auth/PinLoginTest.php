@@ -2,6 +2,7 @@
 
 use App\Domain\Identity\Enums\Role;
 use App\Models\User;
+use Spatie\Activitylog\Models\Activity;
 
 function staffWithPin(string $pin = '4321', array $attributes = []): User
 {
@@ -29,6 +30,11 @@ test('staff sign in with the correct PIN on a registered terminal', function () 
         ->assertRedirect(route('dashboard'));
 
     $this->assertAuthenticatedAs($user);
+
+    $record = Activity::where('event', 'login')->where('causer_id', $user->id)->sole();
+    expect($record->properties['method'])->toBe('pin')
+        ->and($record->properties['terminal'])->toBe('C1')
+        ->and($user->fresh()->last_login_at)->not->toBeNull();
 });
 
 test('a wrong PIN is rejected', function () {

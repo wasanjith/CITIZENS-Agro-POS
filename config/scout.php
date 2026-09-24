@@ -1,5 +1,7 @@
 <?php
 
+use App\Domain\Catalog\Models\Product;
+
 return [
 
     /*
@@ -139,16 +141,21 @@ return [
     'meilisearch' => [
         'host' => env('MEILISEARCH_HOST', 'http://localhost:7700'),
         'key' => env('MEILISEARCH_KEY'),
+        // Applied with: php artisan scout:sync-index-settings (docs/ARCHITECTURE.md section 6).
         'index-settings' => [
-            // 'users' => [
-            //     'filterableAttributes' => ['id', 'name', 'email'],
-            //     'embedders' => [
-            //         'default' => [
-            //             'source' => 'userProvided',
-            //             'dimensions' => 1536,
-            //         ],
-            //     ],
-            // ],
+            Product::class => [
+                'searchableAttributes' => [
+                    'short_code', 'variant_codes', 'name', 'variant_names', 'aliases',
+                    'name_si', 'name_ta', 'brand', 'attributes', 'category', 'category_path',
+                ],
+                'filterableAttributes' => ['category_id', 'category_ids', 'brand_id', 'is_active'],
+                'sortableAttributes' => ['sales_velocity_30d', 'name'],
+                'rankingRules' => ['words', 'typo', 'proximity', 'attribute', 'exactness', 'sales_velocity_30d:desc'],
+                'typoTolerance' => [
+                    'minWordSizeForTypos' => ['oneTypo' => 4, 'twoTypos' => 8],
+                    'disableOnAttributes' => ['short_code', 'variant_codes'],
+                ],
+            ],
         ],
         'model-settings' => [
             // User::class => [

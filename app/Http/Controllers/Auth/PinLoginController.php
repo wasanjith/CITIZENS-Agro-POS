@@ -61,14 +61,6 @@ class PinLoginController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        $user->forceFill(['last_login_at' => now()])->saveQuietly();
-        activity()
-            ->causedBy($user)
-            ->performedOn($user)
-            ->event('login')
-            ->withProperties(['terminal' => $terminal?->code])
-            ->log('Signed in with PIN');
-
         return redirect()->intended(route('dashboard'));
     }
 }

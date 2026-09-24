@@ -22,7 +22,7 @@
             <a href="{{ route('dashboard') }}" class="text-lg font-bold tracking-tight text-white">CITIZENS Agro</a>
         </div>
         @include('layouts.partials.sidebar')
-        <p class="px-6 pb-4 text-xs text-brand-200/70">POS · v0.1 (Phase 0)</p>
+        <p class="px-6 pb-4 text-xs text-brand-200/70">POS · v0.2 (Phase 1)</p>
     </aside>
 
     <div class="lg:pl-60">
@@ -46,6 +46,49 @@
                     </span>
                 @endif
             </div>
+
+            @can('catalog.view')
+                <div
+                    class="relative hidden w-72 md:block"
+                    x-data="productSearch({ url: @js(route('api.pos.search')) })"
+                    @click.outside="open = false"
+                >
+                    <label for="global-product-search" class="sr-only">Search products</label>
+                    <input
+                        type="search"
+                        id="global-product-search"
+                        x-model="query"
+                        x-hotkey.ctrl.k="$el.focus(); $el.select()"
+                        @input.debounce.150ms="search()"
+                        @focus="items.length && (open = true)"
+                        @keydown.arrow-down.prevent="move(1)"
+                        @keydown.arrow-up.prevent="move(-1)"
+                        @keydown.enter.prevent="go()"
+                        @keydown.escape="open = false"
+                        placeholder="Search products (Ctrl+K)"
+                        autocomplete="off"
+                        class="block w-full rounded-md border-gray-300 bg-gray-50 text-sm focus:border-brand-500 focus:bg-white focus:ring-brand-500"
+                    >
+                    <ul x-show="open" x-cloak class="absolute right-0 z-40 mt-1 max-h-96 w-96 overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black/5">
+                        <template x-for="(item, index) in items" :key="item.key">
+                            <li
+                                @click="go(item)"
+                                @mouseenter="highlighted = index"
+                                :class="index === highlighted ? 'bg-brand-50' : ''"
+                                class="flex cursor-pointer items-start justify-between gap-3 px-3 py-2"
+                            >
+                                <span class="min-w-0">
+                                    <span class="font-mono text-xs font-semibold text-brand-700" x-text="item.short_code"></span>
+                                    <span class="font-medium text-gray-900" x-text="item.name"></span>
+                                    <span class="block truncate font-sinhala text-xs text-gray-500" x-text="item.name_si"></span>
+                                </span>
+                                <span class="whitespace-nowrap text-xs tabular text-gray-600" x-text="price(item)"></span>
+                            </li>
+                        </template>
+                        <li x-show="items.length === 0" class="px-3 py-2 text-gray-500">No products found.</li>
+                    </ul>
+                </div>
+            @endcan
 
             <div class="flex items-center gap-3" x-data="{ open: false }" @click.outside="open = false">
                 <button type="button" class="flex items-center gap-2 rounded-full p-0.5 text-sm" @click="open = !open" :aria-expanded="open">

@@ -8,7 +8,7 @@
     <div class="text-sm text-gray-600">{{ $slot }}</div>
 
     <x-slot:footer>
-        <x-ui.button variant="secondary" x-on:click="$dispatch('close-modal', @js($name))">Cancel</x-ui.button>
+        <x-ui.button variant="secondary" x-on:click="$dispatch('close-modal', {{ \Illuminate\Support\Js::from($name) }})">Cancel</x-ui.button>
         <form method="POST" action="{{ $action }}">
             @csrf
             @if (strtoupper($method) !== 'POST')

@@ -15,10 +15,14 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             TerminalSeeder::class,
             DocumentSequenceSeeder::class,
+            CatalogSeeder::class,
         ]);
 
         if (app()->environment('local')) {
-            $this->call(DevelopmentUserSeeder::class);
+            $this->call([
+                DevelopmentUserSeeder::class,
+                DevelopmentCatalogSeeder::class,
+            ]);
         }
     }
 }

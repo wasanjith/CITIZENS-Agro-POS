@@ -3,6 +3,14 @@
         'Overview' => [
             ['label' => 'Dashboard', 'route' => 'dashboard', 'active' => 'dashboard', 'can' => null],
         ],
+        'Catalog' => [
+            ['label' => 'Products', 'route' => 'catalog.products.index', 'active' => 'catalog.products.*', 'can' => 'catalog.view'],
+            ['label' => 'Categories', 'route' => 'catalog.categories.index', 'active' => 'catalog.categories.*', 'can' => 'catalog.manage'],
+            ['label' => 'Brands', 'route' => 'catalog.brands.index', 'active' => 'catalog.brands.*', 'can' => 'catalog.manage'],
+            ['label' => 'Units', 'route' => 'catalog.units.index', 'active' => 'catalog.units.*', 'can' => 'catalog.manage'],
+            ['label' => 'Search synonyms', 'route' => 'catalog.synonyms.index', 'active' => 'catalog.synonyms.*', 'can' => 'catalog.synonyms.manage'],
+            ['label' => 'Taxes', 'route' => 'catalog.taxes.index', 'active' => 'catalog.taxes.*', 'can' => 'admin.settings.manage'],
+        ],
         'Administration' => [
             ['label' => 'Users', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'admin.users.manage'],
             ['label' => 'Terminals', 'route' => 'admin.terminals.index', 'active' => 'admin.terminals.*', 'can' => 'admin.terminals.manage'],

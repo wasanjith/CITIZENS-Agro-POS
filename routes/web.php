@@ -8,7 +8,15 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\TerminalDeviceController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Api\ProductSearchController;
 use App\Http\Controllers\Auth\PinLoginController;
+use App\Http\Controllers\Catalog\BrandController;
+use App\Http\Controllers\Catalog\CategoryController;
+use App\Http\Controllers\Catalog\ProductController;
+use App\Http\Controllers\Catalog\ProductImportController;
+use App\Http\Controllers\Catalog\SearchSynonymController;
+use App\Http\Controllers\Catalog\TaxController;
+use App\Http\Controllers\Catalog\UnitController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UnregisteredTerminalController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +33,24 @@ Route::middleware(['guest', 'terminal'])->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/account', [AccountController::class, 'show'])->name('account');
+
+    Route::get('/api/pos/search', ProductSearchController::class)->middleware('throttle:120,1')->name('api.pos.search');
+
+    Route::prefix('catalog')->name('catalog.')->group(function () {
+        Route::get('products/export', [ProductImportController::class, 'export'])->name('products.export');
+        Route::get('products/import', [ProductImportController::class, 'create'])->name('products.import');
+        Route::get('products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
+        Route::post('products/import', [ProductImportController::class, 'preview'])->name('products.import.preview');
+        Route::post('products/import/{token}', [ProductImportController::class, 'store'])->whereUuid('token')->name('products.import.store');
+        Route::get('products/next-code', [ProductController::class, 'nextCode'])->name('products.next-code');
+        Route::resource('products', ProductController::class);
+
+        Route::resource('categories', CategoryController::class)->except(['show']);
+        Route::resource('brands', BrandController::class)->except(['show']);
+        Route::resource('units', UnitController::class)->except(['show', 'destroy']);
+        Route::resource('taxes', TaxController::class)->except(['show', 'destroy']);
+        Route::resource('synonyms', SearchSynonymController::class)->except(['show']);
+    });
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', UserController::class)->except(['show', 'destroy']);

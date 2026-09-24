@@ -47,9 +47,8 @@ class FortifyServiceProvider extends ServiceProvider
                 return null;
             }
 
-            $user->forceFill(['last_login_at' => now()])->saveQuietly();
-            activity()->causedBy($user)->performedOn($user)->event('login')->log('Signed in with password');
-
+            // Fortify may run this callback twice per sign-in (2FA check + login), so the
+            // "signed in" record is written by the Login event listener instead.
             return $user;
         });
 

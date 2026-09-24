@@ -297,29 +297,29 @@ favorite_products: id, user_id null (null = shop-wide), product_id, variant_id n
 ```
 
 ### Work items
-- [ ] Models + factories + policies for all tables above.
-- [ ] Seeders: units (kg, g, bag, packet, piece, pair, set, litre, ml, roll, metre), Retail/Wholesale/Farmer price lists, sample categories (Fertilizers, Seeds, Agro-chemicals, Tools, Bicycle Parts → Tyres, Tubes, Chains, Brakes, Gears …).
-- [ ] **Short code generator:** next free code per category range (e.g. Fertilizer 1000–1999, Seeds 2000–2999, Bike 5000–6999), editable.
-- [ ] Product Blade pages: list (filters: category, brand, active, low stock), create/edit form with tabs (General · Units & Prices · Variants · Search & Names · Stock settings), show page (stock by batch, price history, movement history).
-- [ ] Unit conversion editor (Alpine): "1 Bag = 50 kg", default sale unit, default purchase unit.
-- [ ] Price editor per unit × price list; price change history; minimum price/margin guard (visible only with `catalog.cost.view`).
-- [ ] Category tree page, brand page, unit page, synonym management page.
-- [ ] **Excel import** (`maatwebsite/excel`): template download → upload → preview with row validation errors → commit. Columns: short_code, name, name_si, aliases, category, brand, base_unit, sale units + factors, retail/wholesale price, reorder level, opening stock, cost, batch/expiry.
-- [ ] Excel export of the product list.
+- [x] Models + factories + policies for all tables above.
+- [x] Seeders: units (kg, g, bag, packet, piece, pair, set, litre, ml, roll, metre), Retail/Wholesale/Farmer price lists, sample categories (Fertilizers, Seeds, Agro-chemicals, Tools, Bicycle Parts → Tyres, Tubes, Chains, Brakes, Gears …).
+- [x] **Short code generator:** next free code per category range (e.g. Fertilizer 1000–1999, Seeds 2000–2999, Bike 5000–6999), editable.
+- [x] Product Blade pages: list (filters: category, brand, active, low stock), create/edit form with tabs (General · Units & Prices · Variants · Search & Names · Stock settings), show page (stock by batch, price history, movement history). *(Low-stock filter, stock by batch and movement history wait for Phase 2 stock tables.)*
+- [x] Unit conversion editor (Alpine): "1 Bag = 50 kg", default sale unit, default purchase unit.
+- [x] Price editor per unit × price list; price change history; minimum price/margin guard (visible only with `catalog.cost.view`).
+- [x] Category tree page, brand page, unit page, synonym management page.
+- [x] **Excel import** (`maatwebsite/excel`): template download → upload → preview with row validation errors → commit. Columns: short_code, name, name_si, aliases, category, brand, base_unit, sale units + factors, retail/wholesale price, reorder level, opening stock, cost, batch/expiry.
+- [x] Excel export of the product list.
 
 ### Search
-- [ ] `Product::toSearchableArray()` → id, short_code, name, name_si, name_ta, aliases, brand, category, category_path, attributes (flattened), variant codes/names, is_active, sales_velocity_30d.
-- [ ] Meilisearch index settings in `config/scout.php` → `searchableAttributes` (order from architecture §6), `filterableAttributes` (category_id, brand_id, is_active), `sortableAttributes`, `rankingRules` (words, typo, proximity, attribute, exactness, `sales_velocity_30d:desc`), `typoTolerance` (min word size 4/8, disabled on `short_code`).
-- [ ] Synonyms from `search_synonyms` pushed to Meilisearch on save (`SyncSearchSynonymsJob`).
-- [ ] `ProductSearchService::search(string $q, array $filters, int $limit = 20)`:
+- [x] `Product::toSearchableArray()` → id, short_code, name, name_si, name_ta, aliases, brand, category, category_path, attributes (flattened), variant codes/names, is_active, sales_velocity_30d.
+- [x] Meilisearch index settings in `config/scout.php` → `searchableAttributes` (order from architecture §6), `filterableAttributes` (category_id, brand_id, is_active), `sortableAttributes`, `rankingRules` (words, typo, proximity, attribute, exactness, `sales_velocity_30d:desc`), `typoTolerance` (min word size 4/8, disabled on `short_code`).
+- [x] Synonyms from `search_synonyms` pushed to Meilisearch on save (`SyncSearchSynonymsJob`).
+- [x] `ProductSearchService::search(string $q, array $filters, int $limit = 20)`:
   1. Parse `qty*term` syntax (`5*urea`, `2.5*tsp`).
   2. If `q` is an exact short_code (product or variant) → return that single item.
   3. Else Meilisearch; on connection failure fall back to MySQL `MATCH … AGAINST` (ngram) + `LIKE` on short_code.
   4. Hydrate IDs with **live** stock from `stock_levels` (sum qty_on_hand − qty_reserved) and prices for the requested price list, in one query each.
   5. Strip cost fields unless user has `catalog.cost.view`.
-- [ ] `GET /api/pos/search?q=` JSON endpoint (throttled 120/min per user). Target p95 < 150 ms on LAN.
-- [ ] Nightly job `RecalculateSalesVelocityJob` (after Phase 3 sales exist) + reindex.
-- [ ] Global product search box in back-office top bar using the same endpoint.
+- [x] `GET /api/pos/search?q=` JSON endpoint (throttled 120/min per user). Target p95 < 150 ms on LAN.
+- [ ] Nightly job `RecalculateSalesVelocityJob` (after Phase 3 sales exist) + reindex. *(deferred: needs Phase 3 sales)*
+- [x] Global product search box in back-office top bar using the same endpoint.
 
 ### Tests
 - Exact short code wins; typo (`ureea`) finds Urea; Sinhala `යූරියා` and alias `yuriya` find Urea; `5*urea` returns qty 5.
