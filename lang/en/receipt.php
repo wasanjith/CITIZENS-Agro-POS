@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'invoice' => 'Invoice',
+    'invoice_no' => 'Invoice No',
+    'date' => 'Date',
+    'counter' => 'Counter',
+    'staff' => 'Served by',
+    'cashier' => 'Cashier',
+    'item' => 'Item',
+    'qty' => 'Qty',
+    'price' => 'Price',
+    'amount' => 'Amount',
+    'subtotal' => 'Subtotal',
+    'discount' => 'Discount',
+    'total' => 'Total',
+    'paid' => 'Paid',
+    'paid_cash' => 'Paid (cash)',
+    'balance' => 'Balance',
+    'credit' => 'Credit',
+    'copy' => 'COPY',
+    'sample' => 'SAMPLE - NOT VALID',
+    'items_count' => 'Items',
+    'thank_you' => 'Thank you!',
+    'currency' => 'Rs.',
+];

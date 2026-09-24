@@ -1,0 +1,44 @@
+@php
+    $sections = [
+        'Overview' => [
+            ['label' => 'Dashboard', 'route' => 'dashboard', 'active' => 'dashboard', 'can' => null],
+        ],
+        'Administration' => [
+            ['label' => 'Users', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'admin.users.manage'],
+            ['label' => 'Terminals', 'route' => 'admin.terminals.index', 'active' => 'admin.terminals.*', 'can' => 'admin.terminals.manage'],
+            ['label' => 'Printers', 'route' => 'admin.printers.index', 'active' => 'admin.printers.*', 'can' => 'admin.terminals.manage'],
+            ['label' => 'Printing test', 'route' => 'admin.printing-test', 'active' => 'admin.printing-test*', 'can' => 'admin.terminals.manage'],
+            ['label' => 'Settings', 'route' => 'admin.settings.edit', 'params' => ['group' => 'shop'], 'active' => 'admin.settings.*', 'can' => 'admin.settings.manage'],
+            ['label' => 'Audit log', 'route' => 'admin.audit.index', 'active' => 'admin.audit.*', 'can' => 'admin.audit.view'],
+        ],
+    ];
+@endphp
+
+<nav class="flex flex-1 flex-col gap-6 px-3 py-4" aria-label="Main">
+    @foreach ($sections as $heading => $items)
+        @php
+            $visible = array_filter($items, fn ($item) => $item['can'] === null || auth()->user()->can($item['can']));
+        @endphp
+        @if ($visible)
+            <div>
+                <p class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-200/80">{{ $heading }}</p>
+                <ul class="mt-2 space-y-1">
+                    @foreach ($visible as $item)
+                        @php $isActive = request()->routeIs($item['active']); @endphp
+                        <li>
+                            <a
+                                href="{{ route($item['route'], $item['params'] ?? []) }}"
+                                @class([
+                                    'block rounded-md px-3 py-2 text-sm font-medium',
+                                    'bg-brand-800 text-white' => $isActive,
+                                    'text-brand-100 hover:bg-brand-800/60 hover:text-white' => ! $isActive,
+                                ])
+                                @if ($isActive) aria-current="page" @endif
+                            >{{ $item['label'] }}</a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+    @endforeach
+</nav>

@@ -1,0 +1,43 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource/noto-sans-sinhala/400.css';
+@import '@fontsource/noto-sans-sinhala/600.css';
+@import '@fontsource/noto-sans-sinhala/700.css';
+
+@plugin '@tailwindcss/forms';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    /* Latin text uses Inter; Sinhala glyphs fall through to Noto Sans Sinhala. */
+    --font-sans: 'Inter Variable', 'Noto Sans Sinhala', ui-sans-serif, system-ui, sans-serif;
+    --font-sinhala: 'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif;
+
+    /* Brand: agro green */
+    --color-brand-50: #eefbf3;
+    --color-brand-100: #d6f5e1;
+    --color-brand-200: #b0e9c7;
+    --color-brand-300: #7cd6a6;
+    --color-brand-400: #46bc80;
+    --color-brand-500: #23a164;
+    --color-brand-600: #16824f;
+    --color-brand-700: #136842;
+    --color-brand-800: #125336;
+    --color-brand-900: #10442e;
+    --color-brand-950: #07261a;
+}
+
+@layer base {
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+}
