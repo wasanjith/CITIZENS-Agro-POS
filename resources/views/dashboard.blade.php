@@ -19,12 +19,29 @@
         <x-ui.stat-tile label="Active users" :value="$stats['users']" :hint="$stats['printers'].' printers configured'" :href="auth()->user()->can('admin.users.manage') ? route('admin.users.index') : null" />
     </div>
 
-    <x-ui.card title="What's next" description="The system is being built in phases." class="mt-6">
-        <ul class="list-inside list-disc space-y-1 text-sm text-gray-600">
-            <li><strong>Phase 0 (now):</strong> users, roles, PIN sign-in, terminals, printers, settings, audit log, Sinhala printing test.</li>
-            <li><strong>Phase 1:</strong> product catalogue and search.</li>
-            <li><strong>Phase 2:</strong> stock, purchase orders and goods receiving.</li>
-            <li><strong>Phase 3:</strong> counter billing, settlement at the main cashier, Live Billing and cashier handover.</li>
-        </ul>
+    <x-ui.card title="Point of sale" class="mt-6">
+        <div class="flex flex-wrap gap-2">
+            @if ($terminal && $user->can('pos.sell'))
+                <x-ui.button :href="route('pos.counter')">Billing screen</x-ui.button>
+            @endif
+            @if ($terminal?->isMainCashier() && $user->canAny(['pos.settle', 'drawer.manage']))
+                <x-ui.button :href="route('pos.cashier')">Cashier</x-ui.button>
+            @endif
+            @can('pos.live_view')
+                <x-ui.button variant="secondary" :href="route('admin.live-billing')">Live Billing</x-ui.button>
+                <x-ui.button variant="secondary" :href="route('sales.index')">Invoices</x-ui.button>
+            @endcan
+            @can('drawer.handover')
+                <x-ui.button variant="secondary" :href="route('admin.delegations.index')">Cashier authority</x-ui.button>
+            @endcan
+        </div>
+
+        @if ($today !== null)
+            <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                <x-ui.stat-tile label="Settled today" :value="'Rs. '.number_format((float) $today['total'], 2)" :hint="$today['count'].' invoices'" />
+                <x-ui.stat-tile label="Waiting for settlement" :value="$today['waiting']" />
+                <x-ui.stat-tile label="Voids today" :value="$today['voids']" />
+            </div>
+        @endif
     </x-ui.card>
 @endsection

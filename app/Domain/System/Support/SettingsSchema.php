@@ -57,6 +57,7 @@ class SettingsSchema
                     'max_discount_percent_manager' => ['label' => 'Max discount without approval: Manager (%)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:100']],
                     'closing_time' => ['label' => 'Shop closing time', 'type' => 'time', 'rules' => ['required', 'date_format:H:i'], 'hint' => 'Default expiry time for a cashier handover.'],
                     'settle_warning_minutes' => ['label' => 'Warn when an invoice waits for settlement longer than (minutes)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:1', 'max:120']],
+                    'invoice_sound' => ['label' => 'Play a sound on the cashier screen when a counter prints an invoice', 'type' => 'checkbox', 'rules' => ['boolean']],
                 ],
             ],
             'inventory' => [

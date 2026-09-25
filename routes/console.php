@@ -1,9 +1,12 @@
 <?php
 
+use App\Domain\CashDrawer\Jobs\ProcessExpiredDelegationsJob;
 use App\Domain\Identity\Actions\SaveUserAction;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Inventory\Actions\PostOpeningStockAction;
 use App\Domain\Inventory\Jobs\LowStockAndExpiryAlertJob;
+use App\Domain\Sales\Jobs\PruneCounterEventsJob;
+use App\Domain\Sales\Jobs\RecalculateSalesVelocityJob;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
@@ -44,3 +47,6 @@ Artisan::command('inventory:post-opening-stock', function (PostOpeningStockActio
 })->purpose('Post opening stock from the product import as OPENING stock movements');
 
 Schedule::job(new LowStockAndExpiryAlertJob)->dailyAt('07:00');
+Schedule::job(new ProcessExpiredDelegationsJob)->everyMinute();
+Schedule::job(new PruneCounterEventsJob)->dailyAt('02:30');
+Schedule::job(new RecalculateSalesVelocityJob)->dailyAt('02:45');

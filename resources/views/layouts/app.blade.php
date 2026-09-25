@@ -22,7 +22,7 @@
             <a href="{{ route('dashboard') }}" class="text-lg font-bold tracking-tight text-white">CITIZENS Agro</a>
         </div>
         @include('layouts.partials.sidebar')
-        <p class="shrink-0 px-6 py-4 text-xs text-brand-200/70">POS · v0.3 (Phase 2)</p>
+        <p class="shrink-0 px-6 py-4 text-xs text-brand-200/70">POS · v0.4 (Phase 3)</p>
     </aside>
 
     <div class="lg:pl-60">

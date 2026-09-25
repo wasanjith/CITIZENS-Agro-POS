@@ -3,6 +3,14 @@
         'Overview' => [
             ['label' => 'Dashboard', 'route' => 'dashboard', 'active' => 'dashboard', 'can' => null],
         ],
+        'POS' => [
+            ['label' => 'Billing screen', 'route' => 'pos.counter', 'active' => 'pos.counter', 'can' => 'pos.sell'],
+            ['label' => 'Cashier', 'route' => 'pos.cashier', 'active' => 'pos.cashier', 'can' => 'pos.settle'],
+            ['label' => 'Live Billing', 'route' => 'admin.live-billing', 'active' => 'admin.live-billing', 'can' => 'pos.live_view'],
+            ['label' => 'Invoices', 'route' => 'sales.index', 'active' => 'sales.*', 'can' => ['pos.settle', 'pos.live_view', 'reports.sales']],
+            ['label' => 'Cashier authority', 'route' => 'admin.delegations.index', 'active' => 'admin.delegations.*', 'can' => 'drawer.handover'],
+            ['label' => 'Drawer sessions', 'route' => 'admin.drawer-sessions.index', 'active' => 'admin.drawer-sessions.*', 'can' => ['drawer.handover', 'drawer.manage', 'reports.sales']],
+        ],
         'Catalog' => [
             ['label' => 'Products', 'route' => 'catalog.products.index', 'active' => 'catalog.products.*', 'can' => 'catalog.view'],
             ['label' => 'Categories', 'route' => 'catalog.categories.index', 'active' => 'catalog.categories.*', 'can' => 'catalog.manage'],
@@ -28,6 +36,7 @@
             ['label' => 'Users', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'admin.users.manage'],
             ['label' => 'Terminals', 'route' => 'admin.terminals.index', 'active' => 'admin.terminals.*', 'can' => 'admin.terminals.manage'],
             ['label' => 'Printers', 'route' => 'admin.printers.index', 'active' => 'admin.printers.*', 'can' => 'admin.terminals.manage'],
+            ['label' => 'Print log', 'route' => 'admin.print-jobs.index', 'active' => 'admin.print-jobs.*', 'can' => 'admin.terminals.manage'],
             ['label' => 'Printing test', 'route' => 'admin.printing-test', 'active' => 'admin.printing-test*', 'can' => 'admin.terminals.manage'],
             ['label' => 'Settings', 'route' => 'admin.settings.edit', 'params' => ['group' => 'shop'], 'active' => 'admin.settings.*', 'can' => 'admin.settings.manage'],
             ['label' => 'Audit log', 'route' => 'admin.audit.index', 'active' => 'admin.audit.*', 'can' => 'admin.audit.view'],

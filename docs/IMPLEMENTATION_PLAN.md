@@ -318,7 +318,7 @@ favorite_products: id, user_id null (null = shop-wide), product_id, variant_id n
   4. Hydrate IDs with **live** stock from `stock_levels` (sum qty_on_hand − qty_reserved) and prices for the requested price list, in one query each.
   5. Strip cost fields unless user has `catalog.cost.view`.
 - [x] `GET /api/pos/search?q=` JSON endpoint (throttled 120/min per user). Target p95 < 150 ms on LAN.
-- [ ] Nightly job `RecalculateSalesVelocityJob` (after Phase 3 sales exist) + reindex. *(deferred: needs Phase 3 sales)*
+- [x] Nightly job `RecalculateSalesVelocityJob` (after Phase 3 sales exist) + reindex. *(Built in Phase 3, runs at 02:45.)*
 - [x] Global product search box in back-office top bar using the same endpoint.
 
 ### Tests
@@ -452,56 +452,56 @@ counter_events:   id, terminal_id, user_id, sale_id null, cart_uuid, type enum(I
 ```
 
 ### 3.1 Counter POS screen (`/pos`, Counters 1–3 and main terminal): `layouts/pos.blade.php` + Alpine `posCart()`
-- [ ] Left: search box (always focused) + results list with stock badge, price, unit chips, expiry hint; tabs for Favorites / Recent / Categories.
-- [ ] Right: cart (line: name EN + SI, unit select, qty, price, line discount, total), customer select (Phase 4 adds credit), bill discount, **large total display** (staff read it out to the customer).
-- [ ] **Tender panel (F6):** payment method (default CASH), amount tendered with quick buttons (exact, next Rs 100/500/1000/5000), balance shown in large digits. Tendered < total is blocked for CASH. Other methods are marked "confirm at cashier".
-- [ ] Keyboard: F2 search, ↑↓ Enter add, `+`/`-` qty, Del remove, F4 customer, F6 tender, F8 hold, **F9 print invoice**, F10 reprint last, Esc clear.
-- [ ] **Cart sync:** every change → debounced 300 ms `POST /api/pos/cart-sync` → `SyncCounterCartAction` (see 3.6). On load the cart is restored from Redis (survives refresh or power cut).
-- [ ] Discount above the role limit → `approval_request` to the cashier screen; line shows "waiting for approval"; approval arrives via Reverb. Printing is blocked until it is approved or removed.
-- [ ] **`IssueCounterInvoiceAction`** (single DB transaction):
+- [x] Left: search box (always focused) + results list with stock badge, price, unit chips, expiry hint; tabs for Favorites / Recent / Categories.
+- [x] Right: cart (line: name EN + SI, unit select, qty, price, line discount, total), customer select (Phase 4 adds credit), bill discount, **large total display** (staff read it out to the customer). *(F4 customer shows a "Phase 4" note: there is no customers table yet.)*
+- [x] **Tender panel (F6):** payment method (default CASH), amount tendered with quick buttons (exact, next Rs 100/500/1000/5000), balance shown in large digits. Tendered < total is blocked for CASH. Other methods are marked "confirm at cashier". *(Methods now: cash, card, bank transfer, cheque. Credit needs Phase 4 customers; split and real cheque records come with Phase 5.)*
+- [x] Keyboard: F2 search, ↑↓ Enter add, `+`/`-` qty, Del remove, F4 customer, F6 tender, F8 hold, **F9 print invoice**, F10 reprint last, Esc clear.
+- [x] **Cart sync:** every change → debounced 300 ms `POST /api/pos/cart-sync` → `SyncCounterCartAction` (see 3.6). On load the cart is restored from Redis (survives refresh or power cut).
+- [x] Discount above the role limit → `approval_request` to the cashier screen; line shows "waiting for approval"; approval arrives via Reverb. Printing is blocked until it is approved or removed. *(Line and bill discounts. The counter also polls every 5 s while Reverb is down. The PRICE_OVERRIDE type exists but has no screen yet: staff change the price through a discount.)*
+- [x] **`IssueCounterInvoiceAction`** (single DB transaction):
   1. Check idempotency key; reprice every line on the server (never trust client prices); apply approved discounts.
   2. Validate tendered ≥ total for CASH; compute `change_due`.
   3. `StockService::reserve` per line (fails clearly if stock is not available).
   4. `invoice_no` from `DocumentNumber::next('SALE')`; create `sales` (status INVOICED) + `sale_items`.
   5. Write `counter_events` PRINTED, clear the Redis cart, broadcast `InvoiceIssued` on `live-billing`.
   6. Return the print URL → the counter prints on its own printer (3.4).
-- [ ] "Last invoices" drawer on each counter (today's invoices from this counter, with status and a Reprint button).
-- [ ] Hold / recall list per counter (status ON_HOLD, no reservation, no invoice number).
+- [x] "Last invoices" drawer on each counter (today's invoices from this counter, with status and a Reprint button).
+- [x] Hold / recall list per counter (status ON_HOLD, no reservation, no invoice number). *(Recalling removes the held row; the HELD / RECALLED counter events keep the trail.)*
 
 ### 3.2 Settlement at the main cashier (`/pos/cashier`, main terminal only, `pos.settle`)
-- [ ] Middleware: `EnsureMainCashierTerminal` + `can:pos.settle` + an **open drawer session held by the current user** (else redirect to "Open drawer" page).
-- [ ] The screen is the **Live Billing layout** (3.6) with a settle card in each counter column for every INVOICED invoice (invoice no, total, method, tendered, balance, waiting time). Waiting time turns red after N minutes (setting).
-- [ ] Find by invoice number: type the last digits (e.g. `4512`) + Enter opens that settle card.
-- [ ] **`SettleInvoiceAction`** (single DB transaction):
+- [x] Middleware: `EnsureMainCashierTerminal` + `can:pos.settle` + an **open drawer session held by the current user** (else redirect to "Open drawer" page).
+- [x] The screen is the **Live Billing layout** (3.6) with a settle card in each counter column for every INVOICED invoice (invoice no, total, method, tendered, balance, waiting time). Waiting time turns red after N minutes (setting).
+- [x] Find by invoice number: type the last digits (e.g. `4512`) + Enter opens that settle card.
+- [x] **`SettleInvoiceAction`** (single DB transaction): *(Cash settlements only. QZ Tray request signing is still open, so QZ shows its "Allow" prompt.)*
   1. Lock sale `FOR UPDATE`; status must be INVOICED; idempotency check.
   2. Cashier confirms the payment (CASH: amount received = tendered, change given = change_due; CARD/BANK: reference; CREDIT: credit-limit check / approval, from Phase 4; CHEQUE: from Phase 5).
   3. Release reservation → `StockService::issue` (FEFO) per line → `sale_item_batches`, `cost_total`.
   4. Insert `payments` linked to the current `drawer_session`.
   5. Status SETTLED; dispatch `InvoiceSettled` (journal in Phase 5, sales velocity, stock broadcast); `counter_events` SETTLED.
   6. After commit: **open cash drawer** via QZ Tray (`ESC p` to printer #0); column flashes SETTLED.
-- [ ] **`VoidInvoiceAction`** (`pos.void`, reason required): INVOICED → VOID, release reservation, `counter_events` VOIDED, broadcast; the counter gets a prompt "Invoice INV-… voided, restore cart?", which restores the lines to its cart for re-billing.
-- [ ] Void a settled sale (same day, `pos.void`): reversal stock movements, refund payment from the drawer, status VOID, audit log.
-- [ ] Discount / price-override approval requests appear as a banner on the cashier screen (approve / reject).
-- [ ] Direct sale on the main terminal: same counter screen; after printing on printer #0 it goes straight to the settle card.
-- [ ] Day close is **blocked** while any invoice is INVOICED (list shown with Settle / Void).
+- [x] **`VoidInvoiceAction`** (`pos.void`, reason required): INVOICED → VOID, release reservation, `counter_events` VOIDED, broadcast; the counter gets a prompt "Invoice INV-… voided, restore cart?", which restores the lines to its cart for re-billing.
+- [x] Void a settled sale (same day, `pos.void`): reversal stock movements, refund payment from the drawer, status VOID, audit log. *(Stock goes back into the exact batches (SALE_RETURN movements); the refund is a negative payment in the cashier's open session.)*
+- [x] Discount / price-override approval requests appear as a banner on the cashier screen (approve / reject).
+- [x] Direct sale on the main terminal: same counter screen; after printing on printer #0 it goes straight to the settle card.
+- [x] Day close is **blocked** while any invoice is INVOICED (list shown with Settle / Void).
 
 ### 3.3 Drawer sessions & Cashier Handover
-- [ ] Open drawer page: opening float with denomination counter (Rs 5000, 1000, 500, 100, 50, 20, coins).
-- [ ] Pay in / pay out / safe drop pages (reason required).
-- [ ] Close drawer (end of day) → counted cash vs expected (`opening + settled cash − pay outs − drops + pay ins`) → variance → **Z-report** with totals **per counter** and voids (print 80 mm in Sinhala on printer #0 + A4 PDF).
-- [ ] **`HandoverCashierAction`** (owner on main terminal, `drawer.handover`):
+- [x] Open drawer page: opening float with denomination counter (Rs 5000, 1000, 500, 100, 50, 20, coins).
+- [x] Pay in / pay out / safe drop pages (reason required).
+- [x] Close drawer (end of day) → counted cash vs expected (`opening + settled cash − pay outs − drops + pay ins`) → variance → **Z-report** with totals **per counter** and voids (print 80 mm in Sinhala on printer #0 + A4 PDF). *(The Z report covers the whole day: all sessions linked by handovers. Handover slips and an X report of an open drawer use the same layout.)*
+- [x] **`HandoverCashierAction`** (owner on main terminal, `drawer.handover`):
   1. Owner counts drawer → session A closed (`close_reason=HANDOVER`). Unsettled invoices stay INVOICED and move with the authority.
   2. Select Manager, set expiry (default: today's closing time from settings), reason, scope (default from `config/pos.php`; `pos.live_view` can be unticked).
   3. Manager enters PIN on the same screen (re-auth) and **confirms the counted amount** (or disputes → both see the difference, re-count).
   4. Create `delegations` row, open session B with `opening_float = counted`, `previous_session_id = A`.
   5. Log owner out of the terminal; log Manager in; broadcast `CashierAuthorityChanged` (top bar updates everywhere).
-- [ ] **Take back** (`ReturnCashierAuthorityAction`): Manager counts → session B closed with variance → delegation revoked → owner PIN → new session C opened for owner.
-- [ ] **Remote revoke** (owner's phone, `/admin/delegations`): revokes delegation immediately; the Manager's next settlement attempt is blocked with a "Cashier authority revoked, count drawer" screen.
-- [ ] Scheduled job every minute: expire delegations whose `expires_at` has passed (same blocking behaviour).
-- [ ] Handover history report: sessions, holders, times, variances.
+- [x] **Take back** (`ReturnCashierAuthorityAction`): Manager counts → session B closed with variance → delegation revoked → owner PIN → new session C opened for owner.
+- [x] **Remote revoke** (owner's phone, `/admin/delegations`): revokes delegation immediately; the Manager's next settlement attempt is blocked with a "Cashier authority revoked, count drawer" screen.
+- [x] Scheduled job every minute: expire delegations whose `expires_at` has passed (same blocking behaviour). *(Permission checks stop honouring a delegation the moment it expires; the job announces it and notifies the owner.)*
+- [x] Handover history report: sessions, holders, times, variances.
 
 ### 3.4 Sinhala invoice (80 mm) on the counter printers
-- [ ] `print/invoice.blade.php` (layout `print`), locale from terminal/setting (`si` default):
+- [x] `print/invoice.blade.php` (layout `print`), locale from terminal/setting (`si` default):
   ```
   CITIZENS AGRO (Sinhala shop name, address, phone)
   ඉන්වොයිස් අංකය: INV-2026-004512      දිනය: 2026-09-24 14:32
@@ -520,30 +520,30 @@ counter_events:   id, terminal_id, user_id, sale_id null, cart_uuid, type enum(I
   ───────────────────────────────────────────
   (Sinhala footer: return policy / thank you)
   ```
-- [ ] `lang/si/receipt.php` and `lang/en/receipt.php` for all labels; unit names from `units.name_si`; item name `name_si_snapshot ?? name_snapshot`.
-- [ ] CSS: `@page { size: 80mm auto; margin: 0 }`, `font-family: 'Noto Sans Sinhala'`, 11–12 pt items, 14 pt totals, tabular numbers; font preloaded so the first print is not blank.
-- [ ] Print flow (same on all 4 PCs): hidden iframe loads `/pos/sales/{sale}/invoice` → `onload` → `print()`; Chrome runs with `--kiosk-printing`, so it prints silently to that PC's default (thermal) printer. A `print_jobs` row is written.
-- [ ] Reprint (`pos.reprint`): increments `print_count`, prints "පිටපත / COPY", `counter_events` REPRINTED, `print_jobs.is_copy = true`.
-- [ ] A4 invoice (Sinhala/English) PDF for customers who ask for it.
-- [ ] Settings page: receipt language (si / en / si+en), show staff name, footer text (SI/EN), logo on/off.
+- [x] `lang/si/receipt.php` and `lang/en/receipt.php` for all labels; unit names from `units.name_si`; item name `name_si_snapshot ?? name_snapshot`.
+- [x] CSS: `@page { size: 80mm auto; margin: 0 }`, `font-family: 'Noto Sans Sinhala'`, 11–12 pt items, 14 pt totals, tabular numbers; font preloaded so the first print is not blank.
+- [x] Print flow (same on all 4 PCs): hidden iframe loads `/pos/sales/{sale}/invoice` → `onload` → `print()`; Chrome runs with `--kiosk-printing`, so it prints silently to that PC's default (thermal) printer. A `print_jobs` row is written.
+- [x] Reprint (`pos.reprint`): increments `print_count`, prints "පිටපත / COPY", `counter_events` REPRINTED, `print_jobs.is_copy = true`.
+- [x] A4 invoice (Sinhala/English) PDF for customers who ask for it.
+- [x] Settings page: receipt language (si / en / si+en), show staff name, footer text (SI/EN), logo on/off.
 
 ### 3.5 Printers management (`/admin/printers`, `admin.terminals.manage`)
-- [ ] Printer list: terminal, Windows printer name, model, paper width, drawer yes/no, active, last test.
-- [ ] Assign / reassign a printer to a terminal (e.g. move a spare printer to Counter 2 when its printer fails).
-- [ ] **Test print** button: opens `print/test.blade.php` (Sinhala conjunct sample, 80 mm ruler, terminal name, date/time) on the target terminal via a broadcast `TestPrintRequested` to that terminal's private channel; the terminal prints and reports back → `last_test_at`.
-- [ ] Drawer test (main terminal only): QZ Tray `ESC p` command.
-- [ ] Print log page (`print_jobs`): filters by terminal, user, type, copies only.
-- [ ] Health hint on the terminal: if a print result is not confirmed within 10 s, show "Check printer" with a Reprint button.
+- [x] Printer list: terminal, Windows printer name, model, paper width, drawer yes/no, active, last test.
+- [x] Assign / reassign a printer to a terminal (e.g. move a spare printer to Counter 2 when its printer fails).
+- [x] **Test print** button: opens `print/test.blade.php` (Sinhala conjunct sample, 80 mm ruler, terminal name, date/time) on the target terminal via a broadcast `TestPrintRequested` to that terminal's private channel; the terminal prints and reports back → `last_test_at`. *(Needs Reverb and the POS screen open on that terminal; pressed on the terminal itself it prints straight away.)*
+- [x] Drawer test (main terminal only): QZ Tray `ESC p` command.
+- [x] Print log page (`print_jobs`): filters by terminal, user, type, copies only.
+- [x] Health hint on the terminal: if a print result is not confirmed within 10 s, show "Check printer" with a Reprint button.
 
 ### 3.6 Live Billing
-- [ ] **`SyncCounterCartAction`** (`POST /api/pos/cart-sync`, counters only): validates the payload, reprices on the server, stores `live_cart:{terminal_id}` in Redis (lines, totals, customer, tendered, status, user, updated_at; TTL 12 h), diffs against the previous snapshot to write `counter_events` (ITEM_ADDED / QTY_CHANGED / ITEM_REMOVED / CART_CLEARED / TENDERED / CUSTOMER_SET), broadcasts `CounterCartUpdated` on private channel `live-billing`.
-- [ ] Channel auth in `routes/channels.php`: `live-billing` → `can('pos.live_view')`; presence channel `pos-terminals` → any logged-in terminal user (returns terminal, counter_no, user name).
-- [ ] Blade component `x-pos.counter-column` (Alpine `counterColumn(counterNo)`): header (online dot, staff name), status badge (OFFLINE / IDLE / BILLING / PAYMENT / PRINTED + timer / SETTLED flash), live cart lines (new lines highlighted, removed lines struck through in red for 10 s), totals, tendered and balance, settle cards (only when `pos.settle` and main terminal), activity ticker (last 10 events, red for removals, clears, reprints, voids).
-- [ ] `/pos/cashier` = 3 columns + settle actions + bottom bar (today's totals and invoice count per counter, drawer total, waiting-to-settle count, voids today).
-- [ ] `/admin/live-billing` = same component, view only; responsive: 3 columns on desktop/tablet, swipeable tabs on phones; linked from the owner dashboard.
-- [ ] Initial state + fallback: `GET /api/live-billing/snapshot` returns all 3 counters (Redis carts + INVOICED list + today's totals). The page polls it every 3 s when the Echo connection is down.
-- [ ] Optional sound when a counter prints an invoice (setting).
-- [ ] Nightly prune of `counter_events` older than 90 days.
+- [x] **`SyncCounterCartAction`** (`POST /api/pos/cart-sync`, counters only): validates the payload, reprices on the server, stores `live_cart:{terminal_id}` in Redis (lines, totals, customer, tendered, status, user, updated_at; TTL 12 h), diffs against the previous snapshot to write `counter_events` (ITEM_ADDED / QTY_CHANGED / ITEM_REMOVED / CART_CLEARED / TENDERED / CUSTOMER_SET), broadcasts `CounterCartUpdated` on private channel `live-billing`.
+- [x] Channel auth in `routes/channels.php`: `live-billing` → `can('pos.live_view')`; presence channel `pos-terminals` → any logged-in terminal user (returns terminal, counter_no, user name).
+- [x] Blade component `x-pos.counter-column` (Alpine `counterColumn(counterNo)`): header (online dot, staff name), status badge (OFFLINE / IDLE / BILLING / PAYMENT / PRINTED + timer / SETTLED flash), live cart lines (new lines highlighted, removed lines struck through in red for 10 s), totals, tendered and balance, settle cards (only when `pos.settle` and main terminal), activity ticker (last 10 events, red for removals, clears, reprints, voids).
+- [x] `/pos/cashier` = 3 columns + settle actions + bottom bar (today's totals and invoice count per counter, drawer total, waiting-to-settle count, voids today).
+- [x] `/admin/live-billing` = same component, view only; responsive: 3 columns on desktop/tablet, swipeable tabs on phones; linked from the owner dashboard.
+- [x] Initial state + fallback: `GET /api/live-billing/snapshot` returns all 3 counters (Redis carts + INVOICED list + today's totals). The page polls it every 3 s when the Echo connection is down.
+- [x] Optional sound when a counter prints an invoice (setting).
+- [x] Nightly prune of `counter_events` older than 90 days.
 
 ### Tests
 - Issue → settle happy path: invoice number assigned at the counter, stock reserved then issued from the correct batches, payment linked to the open drawer session.

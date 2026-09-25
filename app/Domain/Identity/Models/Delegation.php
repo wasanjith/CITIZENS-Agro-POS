@@ -2,6 +2,7 @@
 
 namespace App\Domain\Identity\Models;
 
+use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Database\Factories\DelegationFactory;
@@ -27,6 +28,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property Carbon $expires_at
  * @property Carbon|null $revoked_at
  * @property int|null $revoked_by
+ * @property Carbon|null $expiry_processed_at
  * @property string|null $reason
  */
 #[Fillable(['from_user_id', 'to_user_id', 'drawer_session_id', 'permissions', 'starts_at', 'expires_at', 'reason'])]
@@ -46,6 +48,8 @@ class Delegation extends Model
             'starts_at' => 'datetime',
             'expires_at' => 'datetime',
             'revoked_at' => 'datetime',
+            'expiry_processed_at' => 'datetime',
+            'drawer_session_id' => 'integer',
         ];
     }
 
@@ -78,6 +82,14 @@ class Delegation extends Model
     public function revokedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'revoked_by');
+    }
+
+    /**
+     * @return BelongsTo<DrawerSession, $this>
+     */
+    public function drawerSession(): BelongsTo
+    {
+        return $this->belongsTo(DrawerSession::class);
     }
 
     /**

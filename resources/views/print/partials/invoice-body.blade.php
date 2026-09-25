@@ -1,5 +1,5 @@
 {{--
-    Invoice content shared by the thermal invoice (and, later, the real counter invoice).
+    Invoice content shared by the 80 mm counter invoice, the A4 invoice and the printing test.
     Expects: $language ('si' | 'en' | 'si+en'), $shop, $receipt, $invoice.
 --}}
 @php
@@ -8,6 +8,7 @@
     $t = fn (string $key) => __('receipt.'.$key, [], $primary).($bilingual ? ' / '.__('receipt.'.$key, [], 'en') : '');
     $money = fn (float $amount) => number_format($amount, 2);
     $qty = fn (float $value) => rtrim(rtrim(number_format($value, 3, '.', ''), '0'), '.');
+    $isCash = $invoice['is_cash'] ?? true;
 @endphp
 
 <div class="center">
@@ -26,6 +27,12 @@
 @if (! empty($invoice['is_sample']))
     <div class="center" style="margin-top: 2mm"><span class="badge">{{ $t('sample') }}</span></div>
 @endif
+@if (! empty($invoice['is_copy']))
+    <div class="center" style="margin-top: 2mm"><span class="badge">{{ __('receipt.copy', [], 'si') }} / {{ __('receipt.copy', [], 'en') }}</span></div>
+@endif
+@if (! empty($invoice['is_void']))
+    <div class="center" style="margin-top: 2mm"><span class="badge">{{ $t('void') }}</span></div>
+@endif
 
 <hr class="rule">
 
@@ -42,8 +49,14 @@
     <div class="item-name">{{ $primary === 'si' ? ($item['name_si'] ?: $item['name']) : $item['name'] }}</div>
     <div class="row item-line">
         <span class="num">{{ $qty($item['qty']) }} {{ $primary === 'si' ? $item['unit_si'] : $item['unit'] }} × {{ $money($item['price']) }}</span>
-        <span class="num">{{ $money($item['total']) }}</span>
+        <span class="num">{{ $money($item['total'] + ($item['discount'] ?? 0)) }}</span>
     </div>
+    @if (($item['discount'] ?? 0) > 0)
+        <div class="row item-line muted">
+            <span>{{ $t('discount') }}</span>
+            <span class="num">-{{ $money($item['discount']) }}</span>
+        </div>
+    @endif
 @endforeach
 
 <hr class="rule">
@@ -54,8 +67,12 @@
         <div class="row"><span>{{ $t('discount') }}</span><span class="num">-{{ $money($invoice['discount']) }}</span></div>
     @endif
     <div class="row grand-total"><span>{{ $t('total') }}</span><span class="num">{{ $money($invoice['total']) }}</span></div>
-    <div class="row"><span>{{ $t('paid_cash') }}</span><span class="num">{{ $money($invoice['tendered']) }}</span></div>
-    <div class="row grand-total"><span>{{ $t('balance') }}</span><span class="num">{{ $money($invoice['balance']) }}</span></div>
+    @if ($isCash)
+        <div class="row"><span>{{ $t('paid_cash') }}</span><span class="num">{{ $money($invoice['tendered']) }}</span></div>
+        <div class="row grand-total"><span>{{ $t('balance') }}</span><span class="num">{{ $money($invoice['balance']) }}</span></div>
+    @else
+        <div class="row"><span>{{ $t('paid') }} ({{ $t('method_'.$invoice['method']) }})</span><span class="num">{{ $money($invoice['tendered']) }}</span></div>
+    @endif
 </div>
 
 <hr class="rule">

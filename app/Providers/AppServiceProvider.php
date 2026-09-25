@@ -11,6 +11,7 @@ use App\Domain\Inventory\Models\Stocktake;
 use App\Domain\Purchasing\Models\GoodsReceipt;
 use App\Domain\Purchasing\Models\PurchaseOrder;
 use App\Domain\Purchasing\Models\SupplierReturn;
+use App\Domain\Sales\Models\Sale;
 use App\Domain\System\Services\Settings;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -46,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
             'purchase_order' => PurchaseOrder::class,
             'goods_receipt' => GoodsReceipt::class,
             'supplier_return' => SupplierReturn::class,
+            'sale' => Sale::class,
         ]);
 
         $this->registerGates();

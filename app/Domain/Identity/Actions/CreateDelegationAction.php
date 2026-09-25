@@ -28,6 +28,7 @@ class CreateDelegationAction
         ?array $permissions = null,
         ?string $reason = null,
         ?CarbonInterface $startsAt = null,
+        ?int $drawerSessionId = null,
     ): Delegation {
         $permissions = array_values(array_unique($permissions ?? PermissionCatalogue::delegable()));
 
@@ -61,6 +62,7 @@ class CreateDelegationAction
             'starts_at' => $startsAt,
             'expires_at' => $expiresAt,
             'reason' => $reason,
+            'drawer_session_id' => $drawerSessionId,
         ]);
 
         $this->delegations->flush();

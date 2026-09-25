@@ -11,6 +11,7 @@ use App\Domain\Inventory\Services\StockService;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -70,6 +71,17 @@ class ProductSearchService
             'engine' => $engine,
             'items' => array_slice($this->hydrate($ids, $priceListId, $user, $term), 0, $limit),
         ];
+    }
+
+    /**
+     * Result items for known products, in the given order (POS favourites, recent, categories).
+     *
+     * @param  list<int>  $ids
+     * @return list<array<string, mixed>>
+     */
+    public function items(array $ids, ?User $user = null, ?int $priceListId = null): array
+    {
+        return $this->hydrate($ids, $priceListId ?? PriceList::default()?->id, $user);
     }
 
     /**
@@ -221,6 +233,7 @@ class ProductSearchService
         $prices = $priceListId !== null ? $this->priceBook->forProducts($ids, $priceListId) : [];
         $showCost = $user?->can('viewCost', Product::class) ?? false;
         $stock = $this->stock->totals($ids);
+        $expiry = $this->nearestExpiry($products->where('track_expiry', true)->keys()->all());
         $items = [];
 
         foreach ($ids as $id) {
@@ -232,6 +245,7 @@ class ProductSearchService
 
             $base = $this->item($product, $prices[$id] ?? [], $showCost);
             $base['stock'] = $stock[$id][0]['available'] ?? '0.000';
+            $base['expiry'] = $expiry[$id][0] ?? null;
             $variants = $onlyVariantId !== null
                 ? $product->variants->where('id', $onlyVariantId)
                 : $this->matchingVariantsFirst($product->variants, $term);
@@ -246,6 +260,7 @@ class ProductSearchService
                         'name' => "{$product->name} {$variant->name}",
                         'variant_name' => $variant->name,
                         'stock' => $stock[$id][$variant->id]['available'] ?? '0.000',
+                        'expiry' => $expiry[$id][$variant->id] ?? null,
                     ];
                 }
             } else {
@@ -254,6 +269,36 @@ class ProductSearchService
         }
 
         return $items;
+    }
+
+    /**
+     * Earliest expiry date of batches that still have stock to sell (the one FEFO sells next).
+     *
+     * @param  list<int>  $productIds
+     * @return array<int, array<int, string>> product_id => [variant_id or 0 => Y-m-d]
+     */
+    private function nearestExpiry(array $productIds): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('stock_levels')
+            ->join('batches', 'batches.id', '=', 'stock_levels.batch_id')
+            ->whereIn('stock_levels.product_id', $productIds)
+            ->whereNotNull('batches.expiry_date')
+            ->whereRaw('stock_levels.qty_on_hand - stock_levels.qty_reserved > 0')
+            ->groupBy('stock_levels.product_id', 'stock_levels.variant_id')
+            ->selectRaw('stock_levels.product_id, stock_levels.variant_id, MIN(batches.expiry_date) AS expiry')
+            ->get();
+
+        $expiry = [];
+
+        foreach ($rows as $row) {
+            $expiry[(int) $row->product_id][(int) ($row->variant_id ?? 0)] = substr((string) $row->expiry, 0, 10);
+        }
+
+        return $expiry;
     }
 
     /**

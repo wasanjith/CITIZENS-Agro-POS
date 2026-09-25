@@ -1,21 +1,27 @@
 <?php
 
+use App\Domain\CashDrawer\Actions\OpenDrawerAction;
+use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\Catalog\Actions\SaveProductAction;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\Unit;
 use App\Domain\Identity\Enums\Role;
+use App\Domain\Identity\Models\Printer;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Identity\Services\TerminalRegistrar;
+use App\Domain\Inventory\Services\StockService;
 use App\Models\User;
 use Brick\Math\BigDecimal;
 use Database\Seeders\CatalogSeeder;
+use Database\Seeders\DocumentSequenceSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -169,4 +175,88 @@ function createUrea(array $attributes = []): Product
         prices: ['Retail' => ['kg' => '190.00', 'bag' => '9000.00'], 'Wholesale' => ['bag' => '8800.00']],
         saleUnit: 'bag',
     );
+}
+
+/*
+|--------------------------------------------------------------------------
+| POS helpers (Phase 3)
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Main cashier + Counter 1 (both registered), owner / manager / staff, catalog and
+ * document numbers. Returns the parts tests need.
+ *
+ * @return array{main: Terminal, mainToken: string, counter: Terminal, counterToken: string, owner: User, manager: User, staff: User}
+ */
+function posSetup(): array
+{
+    test()->seed([CatalogSeeder::class, DocumentSequenceSeeder::class]);
+
+    $owner = userWithRole(Role::SuperAdmin, ['name' => 'Owner']);
+    $owner->setPin('1111');
+    $manager = userWithRole(Role::Manager, ['name' => 'Manager']);
+    $manager->setPin('2222');
+    $staff = userWithRole(Role::SalesStaff, ['name' => 'Nimal']);
+    $staff->setPin('3331');
+
+    [$main, $mainToken] = registeredTerminal(Terminal::factory()->mainCashier()->create());
+    Printer::factory()->create(['terminal_id' => $main->id, 'has_cash_drawer' => true]);
+    [$counter, $counterToken] = registeredTerminal(Terminal::factory()->counter(1)->create());
+    Printer::factory()->create(['terminal_id' => $counter->id]);
+
+    return compact('main', 'mainToken', 'counter', 'counterToken', 'owner', 'manager', 'staff');
+}
+
+/**
+ * Urea with stock: 20 bags (1000 kg) at Rs. 160 / kg cost. Retail: bag 9000, kg 190.
+ */
+function ureaInStock(string $kg = '1000'): Product
+{
+    $urea = createUrea();
+    app(StockService::class)->receive($urea, null, $kg, '160');
+
+    return $urea->refresh();
+}
+
+/**
+ * @param  list<array<string, mixed>>  $lines
+ * @param  array<string, mixed>  $extra
+ * @return array<string, mixed>
+ */
+function cartPayload(array $lines, array $extra = []): array
+{
+    return [
+        'cart_uuid' => $extra['cart_uuid'] ?? (string) Str::uuid(),
+        'payment_method' => 'cash',
+        'lines' => array_map(fn (array $line) => [
+            'key' => $line['key'] ?? $line['product_id'].'-'.($line['variant_id'] ?? 0).'-'.$line['unit_id'],
+            'variant_id' => null,
+            'discount' => '0',
+            ...$line,
+        ], $lines),
+        ...Arr::except($extra, ['cart_uuid']),
+    ];
+}
+
+function unitId(string $name): int
+{
+    return (int) Unit::where('name', $name)->value('id');
+}
+
+/**
+ * Open the main drawer for a user with a float made of Rs. 1000 notes.
+ */
+function openDrawer(Terminal $main, User $holder, int $thousands = 5): DrawerSession
+{
+    return app(OpenDrawerAction::class)->handle($main, $holder, ['1000' => $thousands]);
+}
+
+/**
+ * The test acting as $user on the device registered with $token (cookies are also sent
+ * with JSON requests).
+ */
+function atTerminal(string $token, User $user): TestCase
+{
+    return test()->withCredentials()->withCookie(deviceCookie(), $token)->actingAs($user);
 }

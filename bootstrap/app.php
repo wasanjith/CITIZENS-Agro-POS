@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Inventory\Exceptions\InsufficientStockException;
+use App\Http\Middleware\EnsureCashierSession;
 use App\Http\Middleware\EnsureRegisteredTerminal;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ResolveTerminal;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'terminal' => EnsureRegisteredTerminal::class,
+            'cashier' => EnsureCashierSession::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
         ]);

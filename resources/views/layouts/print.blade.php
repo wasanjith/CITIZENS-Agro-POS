@@ -27,7 +27,7 @@
                 document.fonts.ready.then(() => {
                     setTimeout(() => {
                         window.print();
-                        window.parent?.postMessage({ type: 'citizens:printed' }, '*');
+                        window.parent?.postMessage({ type: 'citizens:printed', job: @js($printJobId ?? null) }, window.location.origin);
                     }, 150);
                 });
             });

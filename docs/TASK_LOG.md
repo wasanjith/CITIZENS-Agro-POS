@@ -73,6 +73,20 @@
 
 Newest first.
 
+### 2026-09-25: Phase 3 built (POS: counter invoices, settlement, Live Billing, handover)
+- **Tables:** drawer_sessions (one open per terminal, database constraint), cash_movements, sales, sale_items, sale_item_batches, payments, approval_requests, counter_events, print_jobs; delegations got `expiry_processed_at`.
+- **Counter screen `/pos`:** search box always focused (codes, names, Sinhala, `5*urea`), favourites / recent / categories, stock badge and expiry hint, cart with unit switch, line and bill discounts, large total, tender panel with quick amounts and a large balance. Keys: F2 search, ↑↓ Enter, + / − / Del, F4, F6, F8 hold / recall, F9 print, F10 reprint, Esc clear. "Last invoices" drawer with reprint.
+- **Printing an invoice (F9):** the server reprices every line (the counter's prices are ignored), checks tendered ≥ total for cash, reserves stock, takes the next gapless number and prints the 80 mm Sinhala invoice silently on that PC's printer. The same key never makes two invoices. A discount above the staff limit waits for the cashier's approval.
+- **Cashier screen `/pos/cashier` (main terminal only, drawer holder with cashier authority):** Live Billing columns with settle cards, find by the last digits, settle (stock issued first-expiry-first-out, payment in the drawer session, drawer kick through QZ Tray for cash), void with a reason (the counter is offered the bill back), discount approvals.
+- **Drawer and handover:** open with a denomination count, pay in / pay out / safe drop, close the day (blocked while invoices wait) with a Z report per counter for the whole day (80 mm and A4). Hand over to the Manager (count, Manager's PIN and matching count, expiry, scope), take back with the owner's PIN, remote revoke from `/admin/delegations`, expiry checked every minute. Handover slips print on the main printer.
+- **Live Billing `/admin/live-billing`:** the same columns, view only, phone tabs. It updates over Reverb and polls every 3 s when Reverb is down.
+- **Also:** invoices list and detail page (items, batches and cost for Owner/Manager, payments, trail), print log, printer test print and reassigning a printer to another terminal, drawer / handover history, dashboard POS card, "invoice sound" setting, nightly counter-event pruning (90 days) and sales-velocity job (deferred from Phase 1).
+- **Tests:** 45 new (254 total): issue → settle, idempotency, repricing, tendered check, stock reservation, first-expiry-first-out batches, voids (waiting and settled), who may settle (staff, Manager with / without handover, counter terminal), expiry, handover and take back, the one-open-drawer constraint, the day-close block, the Z report, cart-sync events, channel authorisation, no costs in Live Billing, and Sinhala invoice rendering.
+- **Checked in headless Chrome** (on a throwaway copy of the database) with two browsers: counter billing → F9 → cashier sees the invoice → settles; discount approval round trip. No JavaScript errors. This found and fixed two search races (a slow result, or Enter pressed straight after typing, could add the wrong item).
+- **Not checked:** real printers and cash drawer, and Reverb (it was not running, so only the 3-second polling was tested).
+- **Set up on another PC:** `php artisan migrate`, `npm run build`. The scheduler must run for handover expiry and the nightly jobs. Start Reverb (`php artisan reverb:start`) for instant Live Billing.
+- **Note:** a first browser run used the development database by mistake (`artisan serve` ignores custom database settings). It registered MAIN and Counter 1 to a test browser, opened a drawer and wrote 11 audit rows. All of it was removed; nothing else was touched.
+
 ### 2026-09-25: Sidebar scrollbar colour
 - The sidebar scrollbar is now thin and green to match the sidebar. The sidebar colour itself is unchanged.
 

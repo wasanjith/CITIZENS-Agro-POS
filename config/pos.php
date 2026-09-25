@@ -136,6 +136,7 @@ return [
             'max_discount_percent_manager' => 10,
             'closing_time' => '18:00',
             'settle_warning_minutes' => 5,
+            'invoice_sound' => false,
         ],
         'inventory' => [
             'allow_negative_stock' => false,
