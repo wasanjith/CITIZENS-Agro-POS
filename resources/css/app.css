@@ -41,3 +41,11 @@
         font-variant-numeric: tabular-nums;
     }
 }
+
+@layer components {
+    /* Sidebar scrollbar: green thumb on the sidebar's own green track. */
+    .sidebar-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-brand-700) var(--color-brand-900);
+    }
+}

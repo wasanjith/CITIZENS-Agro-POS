@@ -183,11 +183,59 @@
                                 </li>
                             @endforeach
                         </ul>
-                        <p class="mt-2 text-xs text-gray-500">Added to stock when inventory goes live.</p>
+                        <p class="mt-2 text-xs text-gray-500">Not in stock yet: use “Add opening stock now” on the Stock on hand page.</p>
                     </div>
                 @endif
+            </x-ui.card>
 
-                <p class="mt-4 text-xs text-gray-500">Stock by batch and movement history appear here once inventory is set up.</p>
+            <x-ui.card title="Stock by batch">
+                @php
+                    $onHand = $stockLevels->reduce(fn ($sum, $level) => $sum->plus($level->qty_on_hand), \Brick\Math\BigDecimal::zero());
+                    $reserved = $stockLevels->reduce(fn ($sum, $level) => $sum->plus($level->qty_reserved), \Brick\Math\BigDecimal::zero());
+                @endphp
+                <p class="text-2xl font-semibold tabular">{{ \App\Domain\Inventory\Support\Qty::format($onHand) }} <span class="text-base font-normal text-gray-500">{{ $product->baseUnit?->symbol }} on hand</span></p>
+                @if ($reserved->isPositive())
+                    <p class="text-sm text-gray-600">{{ \App\Domain\Inventory\Support\Qty::format($reserved) }} reserved for printed invoices</p>
+                @endif
+
+                @if ($stockLevels->isNotEmpty())
+                    <ul class="mt-3 divide-y divide-gray-100 text-sm">
+                        @foreach ($stockLevels as $level)
+                            <li class="flex justify-between gap-3 py-2">
+                                <span>
+                                    @if ($level->variant)<span class="font-medium">{{ $level->variant->name }}</span> · @endif
+                                    {{ $level->batch->label() }}
+                                    @if ($canCost)<span class="block text-xs text-gray-500">cost {{ number_format((float) $level->batch->unit_cost, 2) }} / {{ $product->baseUnit?->symbol }}</span>@endif
+                                </span>
+                                <span class="tabular @if ($level->batch->expiry_date?->isPast()) text-red-700 @endif">{{ \App\Domain\Inventory\Support\Qty::format($level->qty_on_hand) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </x-ui.card>
+
+            <x-ui.card title="Stock movements">
+                <x-slot:actions>
+                    <x-ui.button variant="link" :href="route('inventory.movements.index', ['product' => $product->id])">All</x-ui.button>
+                </x-slot:actions>
+                @if ($movements->isEmpty())
+                    <p class="text-sm text-gray-500">No stock movements yet.</p>
+                @else
+                    <ul class="divide-y divide-gray-100 text-sm">
+                        @foreach ($movements as $movement)
+                            <li class="flex justify-between gap-3 py-2">
+                                <span>
+                                    {{ $movement->type->label() }}
+                                    @if ($movement->reference instanceof \App\Domain\Inventory\Support\StockReference)
+                                        <span class="font-mono text-xs text-gray-500">{{ $movement->reference->referenceLabel() }}</span>
+                                    @endif
+                                    <span class="block text-xs text-gray-500">{{ $movement->created_at->format('Y-m-d H:i') }} · {{ $movement->user?->name ?? 'System' }}</span>
+                                </span>
+                                <span @class(['tabular font-medium', 'text-brand-700' => (float) $movement->qty > 0, 'text-red-700' => (float) $movement->qty < 0])>{{ (float) $movement->qty > 0 ? '+' : '' }}{{ \App\Domain\Inventory\Support\Qty::format($movement->qty) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
             </x-ui.card>
 
             <x-ui.card title="Recent changes">

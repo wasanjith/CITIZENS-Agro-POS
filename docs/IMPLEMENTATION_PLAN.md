@@ -300,7 +300,7 @@ favorite_products: id, user_id null (null = shop-wide), product_id, variant_id n
 - [x] Models + factories + policies for all tables above.
 - [x] Seeders: units (kg, g, bag, packet, piece, pair, set, litre, ml, roll, metre), Retail/Wholesale/Farmer price lists, sample categories (Fertilizers, Seeds, Agro-chemicals, Tools, Bicycle Parts → Tyres, Tubes, Chains, Brakes, Gears …).
 - [x] **Short code generator:** next free code per category range (e.g. Fertilizer 1000–1999, Seeds 2000–2999, Bike 5000–6999), editable.
-- [x] Product Blade pages: list (filters: category, brand, active, low stock), create/edit form with tabs (General · Units & Prices · Variants · Search & Names · Stock settings), show page (stock by batch, price history, movement history). *(Low-stock filter, stock by batch and movement history wait for Phase 2 stock tables.)*
+- [x] Product Blade pages: list (filters: category, brand, active, low stock), create/edit form with tabs (General · Units & Prices · Variants · Search & Names · Stock settings), show page (stock by batch, price history, movement history). *(Low-stock filter, stock by batch and movement history added in Phase 2.)*
 - [x] Unit conversion editor (Alpine): "1 Bag = 50 kg", default sale unit, default purchase unit.
 - [x] Price editor per unit × price list; price change history; minimum price/margin guard (visible only with `catalog.cost.view`).
 - [x] Category tree page, brand page, unit page, synonym management page.
@@ -373,28 +373,28 @@ supplier_returns (+ lines), supplier_ledger (id, supplier_id, date, type, refere
 ```
 
 ### Core inventory service
-- [ ] `StockService` (only place that changes stock):
+- [x] `StockService` (only place that changes stock):
   - `receive(product, variant, qty, unitCost, batchData, reference)` → create/lookup batch, `stock_levels` upsert, movement row.
   - `issue(product, variant, baseQty, reference, strategy = FEFO)` → lock candidate `stock_levels` rows `FOR UPDATE` ordered by `expiry_date IS NULL, expiry_date, received_at`, allocate across batches, write movements, return allocations with cost (for COGS).
   - `reserve()/release()` on `qty_reserved` (reserved when a counter prints an invoice, released on settlement or void).
   - `adjust()` for adjustments and stocktake postings.
   - Setting `allow_negative_stock` (default **false**) → throws `InsufficientStockException`.
-- [ ] Products without batch tracking use one auto "default" batch per product/variant, so all code paths are the same.
-- [ ] Opening stock import (from Phase 1 template) posts `OPENING` movements.
+- [x] Products without batch tracking use one auto "default" batch per product/variant, so all code paths are the same. *(Default batch cost = moving average; batch-tracked products get one batch per receipt, so their cost is FIFO.)*
+- [x] Opening stock import (from Phase 1 template) posts `OPENING` movements. *(New imports post straight away; entries from earlier imports: “Add opening stock now” on Stock on hand, or `php artisan inventory:post-opening-stock`.)*
 
 ### Purchasing work items
-- [ ] Supplier pages: list, create/edit, show (POs, GRNs, ledger, balance).
-- [ ] **PO create page (all roles with `purchasing.po.create`)**: supplier select, product search (same search component), unit select, quantity, current stock and reorder level per line. Unit cost column **only rendered if** user has `catalog.cost.view`; for Sales Staff it is hidden and left null.
-- [ ] Reorder suggestions button: fills lines with products below reorder level for that supplier (`reorder_qty` or `reorder_level × 2 − on_hand`).
-- [ ] `SubmitPurchaseOrderAction` (DRAFT → SUBMITTED) → notifies Manager/Owner (database notification + badge in top bar).
-- [ ] `ApprovePurchaseOrderAction` (Manager/Owner): fill/confirm unit costs (pre-filled with `supplier_products.last_cost`), approve or reject with reason.
-- [ ] PO PDF (A4, Blade → spatie/laravel-pdf) + "Send": download/print, or share link via WhatsApp (`https://wa.me/<phone>?text=` with PDF link on LAN/tunnel) → status SENT.
-- [ ] **GRN page:** from a PO (lines prefilled with outstanding qty) or direct GRN without PO; enter received qty, free qty, cost, lot no, expiry. `PostGoodsReceiptAction` → `StockService::receive` per line, update `po_lines.received_base_qty`, PO → PARTIAL/RECEIVED, supplier ledger credit, `supplier_products.last_cost`.
-- [ ] Supplier return page → `StockService::issue` from specific batch + supplier ledger debit.
-- [ ] Stock adjustment pages; value above `settings.adjustment_approval_limit` → PENDING_APPROVAL for Super Admin.
-- [ ] Stocktake pages: create (scope), printable count sheet, mobile-friendly counting page (tablet), review variances, post.
-- [ ] Inventory pages: stock on hand (by product / by batch), batch expiry list (30/60/90 days), movement history with filters, low-stock list.
-- [ ] Scheduled `LowStockAndExpiryAlertJob` (daily 07:00) → database notifications.
+- [x] Supplier pages: list, create/edit, show (POs, GRNs, ledger, balance).
+- [x] **PO create page (all roles with `purchasing.po.create`)**: supplier select, product search (same search component), unit select, quantity, current stock and reorder level per line. Unit cost column **only rendered if** user has `catalog.cost.view`; for Sales Staff it is hidden and left null.
+- [x] Reorder suggestions button: fills lines with products below reorder level for that supplier (`reorder_qty` or `reorder_level × 2 − on_hand`).
+- [x] `SubmitPurchaseOrderAction` (DRAFT → SUBMITTED) → notifies Manager/Owner (database notification + badge in top bar).
+- [x] `ApprovePurchaseOrderAction` (Manager/Owner): fill/confirm unit costs (pre-filled with `supplier_products.last_cost`), approve or reject with reason.
+- [x] PO PDF (A4, Blade → spatie/laravel-pdf) + "Send": download/print, or share link via WhatsApp (`https://wa.me/<phone>?text=` with PDF link on LAN/tunnel) → status SENT. *(The WhatsApp message carries a signed PDF link valid for 30 days.)*
+- [x] **GRN page:** from a PO (lines prefilled with outstanding qty) or direct GRN without PO; enter received qty, free qty, cost, lot no, expiry. `PostGoodsReceiptAction` → `StockService::receive` per line, update `po_lines.received_base_qty`, PO → PARTIAL/RECEIVED, supplier ledger credit, `supplier_products.last_cost`.
+- [x] Supplier return page → `StockService::issue` from specific batch + supplier ledger debit.
+- [x] Stock adjustment pages; value above `settings.adjustment_approval_limit` → PENDING_APPROVAL for Super Admin.
+- [x] Stocktake pages: create (scope), printable count sheet, mobile-friendly counting page (tablet), review variances, post.
+- [x] Inventory pages: stock on hand (by product / by batch), batch expiry list (30/60/90 days), movement history with filters, low-stock list.
+- [x] Scheduled `LowStockAndExpiryAlertJob` (daily 07:00) → database notifications.
 
 ### Tests
 - FEFO allocation across 3 batches with different expiry; partial batch consumption.

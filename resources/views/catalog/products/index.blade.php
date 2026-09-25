@@ -17,6 +17,7 @@
         <x-ui.select name="filter[category]" :options="$categories" :value="request('filter.category')" placeholder="All categories" />
         <x-ui.select name="filter[brand]" :options="$brands" :value="request('filter.brand')" placeholder="All brands" />
         <x-ui.select name="filter[status]" :options="['active' => 'Active', 'inactive' => 'Inactive']" :value="request('filter.status')" placeholder="Any status" />
+        <x-ui.checkbox name="filter[low]" label="Low stock" :checked="request('filter.low') === '1'" class="self-center" />
     </x-ui.filter-bar>
 
     @if ($products->isEmpty())
@@ -33,6 +34,7 @@
                 <th>Category</th>
                 <th>Units</th>
                 <th class="text-right">{{ $priceList?->name ?? 'Price' }}</th>
+                <th class="text-right">In stock</th>
                 <th>Status</th>
             </x-slot:head>
 
@@ -65,6 +67,10 @@
                         @else
                             <span class="text-amber-700">No price</span>
                         @endif
+                    </td>
+                    @php $isLow = (float) $product->reorder_level > 0 && (float) $product->on_hand <= (float) $product->reorder_level; @endphp
+                    <td @class(['text-right tabular whitespace-nowrap', 'font-semibold text-amber-700' => $isLow])>
+                        {{ \App\Domain\Inventory\Support\Qty::format((string) $product->on_hand) }} {{ $product->baseUnit?->symbol }}
                     </td>
                     <td>
                         <x-ui.badge :color="$product->is_active ? 'green' : 'red'">{{ $product->is_active ? 'Active' : 'Inactive' }}</x-ui.badge>

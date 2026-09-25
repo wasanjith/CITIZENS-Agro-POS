@@ -9,11 +9,13 @@ use App\Domain\Identity\Enums\Role;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Identity\Services\TerminalRegistrar;
 use App\Models\User;
+use Brick\Math\BigDecimal;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /*
@@ -46,6 +48,18 @@ pest()->extend(TestCase::class)
         $this->seed([RolesAndPermissionsSeeder::class, CatalogSeeder::class]);
     })
     ->in('Search');
+
+/*
+| Concurrency tests race two MySQL connections against each other, so their data
+| must be committed (tables are truncated instead of rolled back).
+*/
+pest()->extend(TestCase::class)
+    ->use(DatabaseTruncation::class)
+    ->beforeEach(function () {
+        $this->withoutVite();
+        $this->seed([RolesAndPermissionsSeeder::class, CatalogSeeder::class]);
+    })
+    ->in('Concurrency');
 
 /*
 |--------------------------------------------------------------------------
@@ -116,6 +130,22 @@ function createProduct(array $attributes = [], array $units = [], array $prices 
     ];
 
     return app(SaveProductAction::class)->handle($data, User::role(Role::SuperAdmin->value)->first() ?? userWithRole(Role::SuperAdmin));
+}
+
+/**
+ * Invariant: every batch's cached stock level equals the sum of its movements,
+ * and no batch has stock without a movement.
+ */
+function expectStockMatchesLedger(): void
+{
+    $ledger = DB::table('stock_movements')->groupBy('batch_id')->selectRaw('batch_id, SUM(qty) AS qty')->pluck('qty', 'batch_id');
+    $levels = DB::table('stock_levels')->pluck('qty_on_hand', 'batch_id');
+
+    foreach ($levels as $batchId => $onHand) {
+        expect(BigDecimal::of((string) $onHand)->compareTo((string) ($ledger[$batchId] ?? '0')))->toBe(0, "Batch {$batchId}: level {$onHand} ≠ ledger ".($ledger[$batchId] ?? 0));
+    }
+
+    expect($ledger->keys()->diff($levels->keys()))->toBeEmpty();
 }
 
 /**

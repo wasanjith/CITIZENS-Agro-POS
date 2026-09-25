@@ -7,6 +7,7 @@ use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductUnit;
 use App\Domain\Catalog\Models\ProductVariant;
+use App\Domain\Inventory\Services\StockService;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -19,7 +20,7 @@ use Throwable;
  *   1. "5*urea" → qty 5, term "urea".
  *   2. An exact short code (product or variant) returns just that item.
  *   3. Otherwise Meilisearch; if it is down, MySQL FULLTEXT (ngram) + LIKE on short codes.
- *   4. Hits are hydrated from MySQL with live prices (and live stock from Phase 2).
+ *   4. Hits are hydrated from MySQL with live prices and live stock (on hand − reserved).
  *   5. Cost fields are only included for users with catalog.cost.view.
  */
 class ProductSearchService
@@ -30,7 +31,10 @@ class ProductSearchService
 
     public const ENGINE_MYSQL = 'mysql';
 
-    public function __construct(private readonly PriceBook $priceBook) {}
+    public function __construct(
+        private readonly PriceBook $priceBook,
+        private readonly StockService $stock,
+    ) {}
 
     /**
      * @param  array{category_id?: int|null, brand_id?: int|null, include_inactive?: bool}  $filters
@@ -216,6 +220,7 @@ class ProductSearchService
 
         $prices = $priceListId !== null ? $this->priceBook->forProducts($ids, $priceListId) : [];
         $showCost = $user?->can('viewCost', Product::class) ?? false;
+        $stock = $this->stock->totals($ids);
         $items = [];
 
         foreach ($ids as $id) {
@@ -226,6 +231,7 @@ class ProductSearchService
             }
 
             $base = $this->item($product, $prices[$id] ?? [], $showCost);
+            $base['stock'] = $stock[$id][0]['available'] ?? '0.000';
             $variants = $onlyVariantId !== null
                 ? $product->variants->where('id', $onlyVariantId)
                 : $this->matchingVariantsFirst($product->variants, $term);
@@ -239,6 +245,7 @@ class ProductSearchService
                         'short_code' => $variant->short_code,
                         'name' => "{$product->name} {$variant->name}",
                         'variant_name' => $variant->name,
+                        'stock' => $stock[$id][$variant->id]['available'] ?? '0.000',
                     ];
                 }
             } else {
@@ -280,6 +287,7 @@ class ProductSearchService
             'allows_decimal' => $unit->unit->allows_decimal,
             'price' => $prices[$unit->unit_id] ?? null,
             'is_default_sale' => $unit->is_default_sale,
+            'is_default_purchase' => $unit->is_default_purchase,
         ])->values()->all();
 
         $default = collect($units)->firstWhere('is_default_sale', true) ?? ($units[0] ?? null);
@@ -298,8 +306,12 @@ class ProductSearchService
             'unit' => $default,
             'price' => $default['price'] ?? null,
             'units' => $units,
-            // Live stock comes from stock_levels once inventory exists (Phase 2).
+            // Available stock in base units (on hand − reserved), filled in by hydrate().
             'stock' => null,
+            'base_unit' => $product->baseUnit?->symbol,
+            'reorder_level' => $product->reorder_level,
+            'track_batches' => $product->track_batches,
+            'track_expiry' => $product->track_expiry,
             'url' => route('catalog.products.show', $product),
         ];
 

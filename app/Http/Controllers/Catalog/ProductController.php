@@ -13,6 +13,9 @@ use App\Domain\Catalog\Models\Tax;
 use App\Domain\Catalog\Models\Unit;
 use App\Domain\Catalog\Services\PriceBook;
 use App\Domain\Catalog\Services\ShortCodeGenerator;
+use App\Domain\Inventory\Models\StockLevel;
+use App\Domain\Inventory\Models\StockMovement;
+use App\Domain\Inventory\Services\StockAlerts;
 use App\Http\Controllers\Concerns\HasListQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Catalog\SaveProductRequest;
@@ -32,7 +35,7 @@ class ProductController extends Controller
         $this->authorize('viewAny', Product::class);
 
         $products = $this->applyListQuery(
-            Product::query()->with(['category', 'brand', 'units.unit']),
+            Product::query()->with(['category', 'brand', 'baseUnit', 'units.unit'])->addSelect(['on_hand' => StockAlerts::onHandSubquery()]),
             $request,
             searchable: ['short_code', 'name', 'name_si', 'aliases', 'sku'],
             sortable: ['short_code', 'name', 'created_at', 'updated_at'],
@@ -70,6 +73,11 @@ class ProductController extends Controller
             'status' => function (Builder $query, string $status): void {
                 $query->where('is_active', $status === 'active');
             },
+            'low' => function (Builder $query, string $value): void {
+                if ($value === '1') {
+                    app(StockAlerts::class)->whereLowStock($query);
+                }
+            },
         ];
     }
 
@@ -85,6 +93,19 @@ class ProductController extends Controller
             'prices' => $priceBook->forProduct($product->id),
             'priceHistory' => $product->prices()->with(['unit', 'priceList', 'creator'])->latest('effective_from')->latest('id')->limit(50)->get(),
             'openingStock' => $product->openingStock()->whereNull('posted_at')->get(),
+            'stockLevels' => StockLevel::query()
+                ->with(['batch', 'variant'])
+                ->where('product_id', $product->id)
+                ->where(fn (Builder $query) => $query->where('qty_on_hand', '!=', 0)->orWhere('qty_reserved', '!=', 0))
+                ->get()
+                ->sortBy(fn (StockLevel $level) => [$level->variant_id ?? 0, $level->batch->expiry_date->timestamp ?? PHP_INT_MAX, $level->batch_id])
+                ->values(),
+            'movements' => StockMovement::query()
+                ->with(['variant', 'batch', 'user', 'reference'])
+                ->where('product_id', $product->id)
+                ->latest('id')
+                ->limit(15)
+                ->get(),
             'activity' => Activity::query()
                 ->where('subject_type', $product->getMorphClass())
                 ->where('subject_id', $product->id)

@@ -59,6 +59,15 @@ class SettingsSchema
                     'settle_warning_minutes' => ['label' => 'Warn when an invoice waits for settlement longer than (minutes)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:1', 'max:120']],
                 ],
             ],
+            'inventory' => [
+                'title' => 'Inventory',
+                'description' => 'Stock rules, adjustment approval and alerts.',
+                'fields' => [
+                    'allow_negative_stock' => ['label' => 'Allow selling more than the stock on hand', 'type' => 'checkbox', 'rules' => ['boolean'], 'hint' => 'Leave off so stock can never go below zero.'],
+                    'adjustment_approval_limit' => ['label' => 'Adjustments above this value need Super Admin approval (Rs.)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:100000000']],
+                    'expiry_alert_days' => ['label' => 'Warn about batches expiring within (days)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:1', 'max:365']],
+                ],
+            ],
         ];
     }
 }

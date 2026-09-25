@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Models;
 
+use App\Domain\Inventory\Support\StockReference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,8 +23,18 @@ use Illuminate\Support\Carbon;
  * @property int|null $created_by
  */
 #[Fillable(['product_id', 'variant_id', 'qty', 'unit_cost', 'lot_no', 'expiry_date', 'posted_at', 'created_by'])]
-class OpeningStockEntry extends Model
+class OpeningStockEntry extends Model implements StockReference
 {
+    public function referenceLabel(): string
+    {
+        return 'Opening stock';
+    }
+
+    public function referenceUrl(): ?string
+    {
+        return null;
+    }
+
     /**
      * @return array<string, string>
      */

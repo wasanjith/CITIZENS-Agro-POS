@@ -8,7 +8,7 @@
     <div x-show="sidebarOpen" x-cloak class="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true">
         <div class="fixed inset-0 bg-gray-900/60" @click="sidebarOpen = false"></div>
         <aside class="relative flex h-full w-64 flex-col bg-brand-900" x-trap.noscroll="sidebarOpen">
-            <div class="flex h-16 items-center justify-between px-4">
+            <div class="flex h-16 shrink-0 items-center justify-between px-4">
                 <span class="text-lg font-bold text-white">CITIZENS Agro</span>
                 <button type="button" class="text-2xl text-brand-100" @click="sidebarOpen = false" aria-label="Close menu">&times;</button>
             </div>
@@ -18,11 +18,11 @@
 
     {{-- Desktop sidebar --}}
     <aside class="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col bg-brand-900">
-        <div class="flex h-16 items-center px-6">
+        <div class="flex h-16 shrink-0 items-center px-6">
             <a href="{{ route('dashboard') }}" class="text-lg font-bold tracking-tight text-white">CITIZENS Agro</a>
         </div>
         @include('layouts.partials.sidebar')
-        <p class="px-6 pb-4 text-xs text-brand-200/70">POS · v0.2 (Phase 1)</p>
+        <p class="shrink-0 px-6 py-4 text-xs text-brand-200/70">POS · v0.3 (Phase 2)</p>
     </aside>
 
     <div class="lg:pl-60">
@@ -89,6 +89,15 @@
                     </ul>
                 </div>
             @endcan
+
+            @php $unreadCount = auth()->user()->unreadNotifications()->count(); @endphp
+            <a href="{{ route('notifications.index') }}" class="relative rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Notifications">
+                <span class="sr-only">Notifications{{ $unreadCount ? " ({$unreadCount} unread)" : '' }}</span>
+                <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg>
+                @if ($unreadCount)
+                    <span class="absolute -right-0.5 -top-0.5 flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-semibold text-white">{{ $unreadCount > 99 ? '99+' : $unreadCount }}</span>
+                @endif
+            </a>
 
             <div class="flex items-center gap-3" x-data="{ open: false }" @click.outside="open = false">
                 <button type="button" class="flex items-center gap-2 rounded-full p-0.5 text-sm" @click="open = !open" :aria-expanded="open">

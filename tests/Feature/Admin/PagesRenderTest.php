@@ -33,6 +33,7 @@ test('every back-office page renders for the owner', function (string $route, ar
     'settings receipt' => ['admin.settings.edit', ['group' => 'receipt']],
     'settings tax' => ['admin.settings.edit', ['group' => 'tax']],
     'settings pos' => ['admin.settings.edit', ['group' => 'pos']],
+    'settings inventory' => ['admin.settings.edit', ['group' => 'inventory']],
     'audit log' => ['admin.audit.index'],
 ]);
 

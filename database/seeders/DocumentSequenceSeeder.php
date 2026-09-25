@@ -14,6 +14,9 @@ class DocumentSequenceSeeder extends Seeder
             ['type' => 'SALE', 'prefix' => 'INV-{Y}-', 'padding' => 6, 'reset_period' => SequenceResetPeriod::Yearly],
             ['type' => 'PO', 'prefix' => 'PO-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
             ['type' => 'GRN', 'prefix' => 'GRN-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
+            ['type' => 'SRN', 'prefix' => 'SRN-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
+            ['type' => 'ADJ', 'prefix' => 'ADJ-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
+            ['type' => 'STK', 'prefix' => 'STK-{Y}-', 'padding' => 4, 'reset_period' => SequenceResetPeriod::Yearly],
         ];
 
         foreach ($sequences as $sequence) {

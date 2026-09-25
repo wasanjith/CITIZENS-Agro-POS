@@ -2,7 +2,10 @@
 
 use App\Domain\Identity\Actions\SaveUserAction;
 use App\Domain\Identity\Enums\Role;
+use App\Domain\Inventory\Actions\PostOpeningStockAction;
+use App\Domain\Inventory\Jobs\LowStockAndExpiryAlertJob;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 
 use function Laravel\Prompts\password;
@@ -33,3 +36,11 @@ Artisan::command('pos:create-owner', function (SaveUserAction $saveUser) {
 
     $this->info("Super Admin {$user->username} created.");
 })->purpose('Create the first Super Admin (shop owner) account');
+
+Artisan::command('inventory:post-opening-stock', function (PostOpeningStockAction $postOpeningStock) {
+    $count = $postOpeningStock->handle();
+
+    $this->info("{$count} opening stock ".str('entry')->plural($count).' posted.');
+})->purpose('Post opening stock from the product import as OPENING stock movements');
+
+Schedule::job(new LowStockAndExpiryAlertJob)->dailyAt('07:00');

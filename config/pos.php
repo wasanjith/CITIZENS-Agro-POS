@@ -137,6 +137,11 @@ return [
             'closing_time' => '18:00',
             'settle_warning_minutes' => 5,
         ],
+        'inventory' => [
+            'allow_negative_stock' => false,
+            'adjustment_approval_limit' => 10000,
+            'expiry_alert_days' => 30,
+        ],
     ],
 
 ];

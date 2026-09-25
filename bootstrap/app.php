@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Inventory\Exceptions\InsufficientStockException;
 use App\Http\Middleware\EnsureRegisteredTerminal;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ResolveTerminal;
@@ -36,4 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Shown to the user as a form error; not a fault worth logging.
+        $exceptions->dontReport(InsufficientStockException::class);
     })->create();

@@ -11,6 +11,19 @@
             ['label' => 'Search synonyms', 'route' => 'catalog.synonyms.index', 'active' => 'catalog.synonyms.*', 'can' => 'catalog.synonyms.manage'],
             ['label' => 'Taxes', 'route' => 'catalog.taxes.index', 'active' => 'catalog.taxes.*', 'can' => 'admin.settings.manage'],
         ],
+        'Inventory' => [
+            ['label' => 'Stock on hand', 'route' => 'inventory.stock.index', 'active' => 'inventory.stock.*', 'can' => 'inventory.view'],
+            ['label' => 'Expiring stock', 'route' => 'inventory.batches.expiry', 'active' => 'inventory.batches.*', 'can' => 'inventory.view'],
+            ['label' => 'Stock movements', 'route' => 'inventory.movements.index', 'active' => 'inventory.movements.*', 'can' => 'inventory.view'],
+            ['label' => 'Adjustments', 'route' => 'inventory.adjustments.index', 'active' => 'inventory.adjustments.*', 'can' => ['inventory.adjust', 'inventory.adjust.approve']],
+            ['label' => 'Stocktakes', 'route' => 'inventory.stocktakes.index', 'active' => 'inventory.stocktakes.*', 'can' => 'inventory.stocktake'],
+        ],
+        'Purchasing' => [
+            ['label' => 'Purchase orders', 'route' => 'purchasing.purchase-orders.index', 'active' => 'purchasing.purchase-orders.*', 'can' => ['purchasing.po.create', 'purchasing.po.approve']],
+            ['label' => 'Goods received', 'route' => 'purchasing.goods-receipts.index', 'active' => 'purchasing.goods-receipts.*', 'can' => 'purchasing.grn.create'],
+            ['label' => 'Supplier returns', 'route' => 'purchasing.supplier-returns.index', 'active' => 'purchasing.supplier-returns.*', 'can' => 'purchasing.grn.create'],
+            ['label' => 'Suppliers', 'route' => 'purchasing.suppliers.index', 'active' => 'purchasing.suppliers.*', 'can' => 'purchasing.suppliers.manage'],
+        ],
         'Administration' => [
             ['label' => 'Users', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'admin.users.manage'],
             ['label' => 'Terminals', 'route' => 'admin.terminals.index', 'active' => 'admin.terminals.*', 'can' => 'admin.terminals.manage'],
@@ -22,10 +35,10 @@
     ];
 @endphp
 
-<nav class="flex flex-1 flex-col gap-6 px-3 py-4" aria-label="Main">
+<nav class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-3 py-4 sidebar-scroll" aria-label="Main">
     @foreach ($sections as $heading => $items)
         @php
-            $visible = array_filter($items, fn ($item) => $item['can'] === null || auth()->user()->can($item['can']));
+            $visible = array_filter($items, fn ($item) => $item['can'] === null || auth()->user()->canAny((array) $item['can']));
         @endphp
         @if ($visible)
             <div>

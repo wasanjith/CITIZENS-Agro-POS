@@ -10,6 +10,7 @@ use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\Unit;
 use App\Domain\Catalog\Services\ShortCodeGenerator;
+use App\Domain\Inventory\Actions\PostOpeningStockAction;
 use App\Http\Requests\Catalog\SaveProductRequest;
 use App\Models\User;
 use Brick\Math\BigDecimal;
@@ -40,6 +41,7 @@ class ProductImporter
     public function __construct(
         private readonly ShortCodeGenerator $codes,
         private readonly SaveProductAction $saveProduct,
+        private readonly PostOpeningStockAction $postOpeningStock,
     ) {}
 
     /**
@@ -110,6 +112,7 @@ class ProductImporter
     {
         $ids = Product::withoutSyncingToSearch(fn () => DB::transaction(function () use ($valid, $actor): array {
             $ids = [];
+            $openingIds = [];
 
             foreach ($valid as $data) {
                 $brandName = $data['brand_name'];
@@ -124,8 +127,13 @@ class ProductImporter
                 $ids[] = $product->id;
 
                 if ($opening !== null) {
-                    OpeningStockEntry::create([...$opening, 'product_id' => $product->id, 'created_by' => $actor->id]);
+                    $openingIds[] = OpeningStockEntry::create([...$opening, 'product_id' => $product->id, 'created_by' => $actor->id])->id;
                 }
+            }
+
+            // Opening stock goes straight into inventory as OPENING movements.
+            if ($openingIds !== []) {
+                $this->postOpeningStock->handle($actor, $openingIds);
             }
 
             return $ids;

@@ -9,12 +9,12 @@
 
 | Item | Status |
 |---|---|
-| **Current phase** | Phase 1: Catalog + Search (built; waiting for the owner's product list) |
-| **Last updated** | 2026-09-24 |
-| **Tests** | 153 Pest tests, all passing (MySQL `citizensDB_testing`; the `Search` suite also uses the local Meilisearch) |
+| **Current phase** | Phase 2: Inventory + Purchasing (built; waiting for opening stock count + a real PO/GRN run) |
+| **Last updated** | 2026-09-25 |
+| **Tests** | 209 Pest tests: 200 passing, 9 skipped (Meilisearch tests; Docker was not running). New `Concurrency` suite races two MySQL connections. |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
-| **Next** | Owner imports the real product list and tries 30 everyday search phrases (Phase 1 acceptance) → printing test on the first printer → Phase 2 (inventory + purchasing) |
+| **Next** | Owner imports the real product list (opening stock now goes straight into stock) and checks stock against the count sheet → one real PO → approve → receive in two deliveries (Phase 2 acceptance) → printing test on the first printer → Phase 3 (POS) |
 
 ### Phase progress
 
@@ -22,7 +22,7 @@
 |---|---|---|
 | 0 | Foundation + printing spike | 🟡 Built · real-printer test pending |
 | 1 | Catalog + Search | 🟡 Built · real product import + 30-phrase search check pending |
-| 2 | Inventory + Purchasing | ⚪ Not started |
+| 2 | Inventory + Purchasing | 🟡 Built · opening stock check + real PO/GRN run pending |
 | 3 | POS core: counter invoices, settlement, Live Billing, handover | ⚪ Not started |
 | 4 | Customers, Credit, Returns, Quotations | ⚪ Not started |
 | 5 | Finance & Banking | ⚪ Not started |
@@ -60,12 +60,37 @@
 | 2026-09-24 | Import only **adds** products; an existing short code is an error. `retail_price`/`wholesale_price` are for the default sale unit; other units get the proportional price. |
 | 2026-09-24 | A deleted product's short code is never reused. Variants share the product's prices. |
 | 2026-09-24 | Excel: `maatwebsite/excel` 4.0 (the Laravel 13 compatible release). |
+| 2026-09-25 | Stock only changes through `StockService` (locked rows, append-only `stock_movements`). Stock can never go below zero unless Settings → Inventory allows it. |
+| 2026-09-25 | Products without batch tracking keep one "general stock" batch with a **moving-average** cost; batch-tracked products get one batch per delivery (FEFO issue, FIFO cost). |
+| 2026-09-25 | GRN batch cost = line total after the GRN discount ÷ all units received, so **free goods lower the cost**. The product's reference cost follows the last GRN. |
+| 2026-09-25 | Receiving more than is still outstanding on a PO line is refused; extra goods go in as free quantity or a separate line. Posted GRNs are never edited; mistakes are fixed with a supplier return. |
+| 2026-09-25 | Stock adjustments and stocktake differences above **Rs. 10,000** (Settings → Inventory) need the Super Admin. |
+| 2026-09-25 | Journal postings for GRNs and adjustments are left for Phase 5 (Finance), when the chart of accounts exists. Supplier payments also come with Phase 5. |
 
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-09-25: Sidebar scrollbar colour
+- The sidebar scrollbar is now thin and green to match the sidebar. The sidebar colour itself is unchanged.
+
+### 2026-09-25: Sidebar scrolling fixed
+- The sidebar menu now scrolls when it is taller than the screen. The logo and version line stay in place (desktop and mobile).
+
+### 2026-09-25: Phase 2 built (Inventory + Purchasing)
+- **Tables:** batches, stock_levels, stock_movements (append-only), stock_adjustments (+ lines), stocktakes (+ lines), suppliers, supplier_products, purchase_orders, po_lines, goods_receipts, grn_lines, supplier_returns (+ lines), supplier_ledger, notifications. New document numbers: `SRN-`, `ADJ-`, `STK-`.
+- **Stock engine:** `StockService` does receive, issue (first-expiry-first-out across batches), reserve/release (for Phase 3 counter invoices) and adjust. Rows are locked, so two counters can't both sell the last units. Tested with two real MySQL connections.
+- **Purchasing:** suppliers (balance + ledger), purchase orders (staff enter quantities only; Manager/Owner fill costs and approve or reject; reorder suggestions; A4 PDF; WhatsApp link), goods receipts (from a PO or direct; free quantity, lot, expiry; partial deliveries), supplier returns from a chosen batch.
+- **Inventory pages:** stock on hand (by product / by batch / low stock, stock value for Owner/Manager), expiring stock (30/60/90/180 days, with write-off), movement history, adjustments with approval, stocktakes (tablet counting page that saves each count as you go, printable blind count sheet, review, post).
+- **Also:** bell with notifications in the top bar (PO waiting for approval, PO approved/rejected, adjustment waiting, daily 07:00 stock alert); product search now shows live stock; product page shows stock by batch and recent movements; product list has an "In stock" column and a low-stock filter; Settings → Inventory tab.
+- **Opening stock:** the product import now adds opening stock to inventory straight away. Entries from earlier imports: **Stock on hand → Add opening stock now** (or `php artisan inventory:post-opening-stock`).
+- **Cost hiding:** Sales Staff never see unit costs, PO totals, stock value or batch costs (pages, JSON, PDF). Tested.
+- **Checked in headless Chrome:** the PO line editor (search, unit, cost prefill, totals) and the adjustment editor work with no JS errors.
+- **Tests:** 56 new (209 total), including the plan's acceptance case (staff PO → manager approves → two deliveries → stock and supplier balance correct) and the invariant *stock level = sum of movements* after every inventory test.
+- **Set up on another PC:** `php artisan migrate`, `php artisan db:seed --class=DocumentSequenceSeeder`, `npm run build`. For the daily alert, the scheduler must run (`php artisan schedule:work`, or a Windows task running `schedule:run` every minute).
+- **Noticed:** with Docker stopped, the site returns 500 (sessions, cache and queue use Redis), and product search waits several seconds before it falls back to MySQL when Meilisearch is down. Neither was changed.
 
 ### 2026-09-24: Phase 1 built (Catalog + Search)
 - **Tables:** categories (tree + short code range), brands, units, taxes, price lists, products (FULLTEXT ngram index), product variants, product units, product prices (price history), search synonyms, favourite products, opening stock entries.
