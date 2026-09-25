@@ -41,9 +41,10 @@ class InvoicePresenter
      */
     public function present(Sale $sale, string $language, bool $isCopy): array
     {
-        $sale->loadMissing(['items', 'invoicedBy', 'invoicedTerminal']);
+        $sale->loadMissing(['items', 'invoicedBy', 'invoicedTerminal', 'customer']);
         $method = $sale->payment_method_intent;
         $isCash = $method === PaymentMethod::Cash;
+        $isCredit = $method === PaymentMethod::Credit;
 
         return [
             'language' => $language,
@@ -69,7 +70,15 @@ class InvoicePresenter
                 'total' => (float) $sale->total,
                 'method' => $method->value,
                 'is_cash' => $isCash,
-                'tendered' => $isCash ? (float) $sale->tendered_amount : (float) $sale->total,
+                'is_credit' => $isCredit,
+                'customer' => $sale->customer !== null ? [
+                    'code' => $sale->customer->code,
+                    'name' => $sale->customer->name,
+                    'name_si' => $sale->customer->name_si,
+                    'phone' => $sale->customer->phone,
+                ] : null,
+                'due_date' => $sale->due_date,
+                'tendered' => $isCash ? (float) $sale->tendered_amount : ($isCredit ? 0.0 : (float) $sale->total),
                 'balance' => $isCash ? (float) $sale->change_due : 0.0,
                 'is_copy' => $isCopy,
                 'is_void' => $sale->status === SaleStatus::Void,

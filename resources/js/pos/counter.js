@@ -48,6 +48,21 @@ export default function posCounter(config) {
         live: false,
         cashier: null,
 
+        // Customer (F4)
+        customer: null,
+        showCustomer: false,
+        customerQuery: '',
+        customerResults: [],
+        customerSearching: false,
+        quickAdd: null,
+
+        // Quotations (F7)
+        showQuotations: false,
+        quotations: [],
+        quotationQuery: '',
+        quoting: false,
+        quoteKey: null,
+
         init() {
             this.cart = this.emptyCart();
             this.restore();
@@ -70,6 +85,8 @@ export default function posCounter(config) {
             return {
                 cart_uuid: uuid(),
                 price_list_id: this.config.default_price_list_id,
+                customer_id: null,
+                quotation_id: null,
                 payment_method: 'cash',
                 tendered: '',
                 bill_discount: '',
@@ -99,6 +116,8 @@ export default function posCounter(config) {
             this.cart = {
                 cart_uuid: snapshot.cart_uuid || uuid(),
                 price_list_id: snapshot.price_list_id ?? this.config.default_price_list_id,
+                customer_id: snapshot.customer_id ?? null,
+                quotation_id: snapshot.quotation_id ?? null,
                 payment_method: snapshot.payment_method ?? 'cash',
                 tendered: snapshot.tendered ?? '',
                 bill_discount: Number(snapshot.bill_discount) > 0 ? snapshot.bill_discount : '',
@@ -106,6 +125,7 @@ export default function posCounter(config) {
                 lines: (snapshot.lines ?? []).map((line) => this.lineFromServer(line)),
             };
             this.server = snapshot;
+            this.refreshCustomer();
         },
 
         lineFromServer(line) {
@@ -381,6 +401,10 @@ export default function posCounter(config) {
             return this.cart.payment_method === 'cash';
         },
 
+        get isCredit() {
+            return this.cart.payment_method === 'credit';
+        },
+
         overLimit(percent) {
             return this.config.max_discount_percent !== null && percent > Number(this.config.max_discount_percent) + 0.0001;
         },
@@ -401,6 +425,7 @@ export default function posCounter(config) {
         get blocked() {
             if (this.cart.lines.length === 0) return 'Add items to the bill.';
             if (this.cart.lines.some((line) => this.lineNeedsApproval(line)) || this.billNeedsApproval) return 'A discount is waiting for the cashier\'s approval.';
+            if (this.isCredit && !this.cart.customer_id) return 'Choose the customer (F4) for a credit sale.';
             if (this.isCash && (this.tendered === null || this.tendered + 0.001 < this.total)) return 'Enter the amount tendered (F6).';
             return null;
         },
@@ -431,6 +456,8 @@ export default function posCounter(config) {
             return {
                 cart_uuid: this.cart.cart_uuid,
                 price_list_id: this.cart.price_list_id,
+                customer_id: this.cart.customer_id,
+                quotation_id: this.cart.quotation_id,
                 payment_method: this.cart.payment_method,
                 tendered: this.cart.tendered === '' ? null : this.cart.tendered,
                 bill_discount: this.cart.bill_discount === '' ? null : this.cart.bill_discount,
@@ -465,7 +492,8 @@ export default function posCounter(config) {
         clearCart(confirmFirst = true) {
             if (confirmFirst && this.cart.lines.length > 0 && !window.confirm('Clear this bill?')) return;
             const keepUuid = this.cart.cart_uuid;
-            this.cart = { ...this.emptyCart(), cart_uuid: keepUuid, price_list_id: this.cart.price_list_id };
+            this.cart = { ...this.emptyCart(), cart_uuid: keepUuid };
+            this.customer = null;
             this.selected = -1;
             this.tender = false;
             this.changed();
@@ -550,6 +578,7 @@ export default function posCounter(config) {
 
                 this.printed = sale;
                 this.cart = this.emptyCart();
+                this.customer = null;
                 this.server = null;
                 this.selected = -1;
                 this.tender = false;
@@ -627,6 +656,7 @@ export default function posCounter(config) {
                 clearTimeout(this.syncTimer);
                 await api(this.config.urls.hold, { method: 'POST', body: { ...this.payload(), note } });
                 this.cart = this.emptyCart();
+                this.customer = null;
                 this.server = null;
                 this.notice = 'Bill held. Recall it with F8.';
             } catch (error) {
@@ -664,6 +694,8 @@ export default function posCounter(config) {
                 ...this.emptyCart(),
                 cart_uuid: cart.cart_uuid ?? uuid(),
                 price_list_id: cart.price_list_id ?? this.config.default_price_list_id,
+                customer_id: cart.customer_id ?? null,
+                quotation_id: cart.quotation_id ?? null,
                 payment_method: cart.payment_method ?? 'cash',
                 bill_discount: Number(cart.bill_discount) > 0 ? cart.bill_discount : '',
                 lines: cart.lines.map((line) => ({ ...line, qty: qty(line.qty), discount: Number(line.discount) > 0 ? line.discount : '', approval_request_id: null, units: [], name: '…', short_code: '' })),
@@ -678,6 +710,8 @@ export default function posCounter(config) {
                     })
                     .filter(Boolean);
             }
+            this.customer = null;
+            await this.refreshCustomer();
         },
 
         async restoreVoided(item) {
@@ -709,8 +743,173 @@ export default function posCounter(config) {
             });
         },
 
-        customer() {
-            this.notice = 'Customer accounts arrive in Phase 4. Bills are cash customers for now.';
+        // ------------------------------------------------------------------ customer (F4)
+
+        openCustomer() {
+            this.showCustomer = true;
+            this.quickAdd = null;
+            this.searchCustomers();
+            this.$nextTick(() => {
+                this.$refs.customerSearch?.focus();
+                this.$refs.customerSearch?.select();
+            });
+        },
+
+        async searchCustomers() {
+            this.customerSearching = true;
+            try {
+                const data = await api(`${this.config.urls.customers}?q=${encodeURIComponent(this.customerQuery.trim())}`);
+                this.customerResults = data.customers ?? [];
+            } catch (error) {
+                this.error = error.message;
+            } finally {
+                this.customerSearching = false;
+            }
+        },
+
+        selectCustomer(customer) {
+            this.customer = customer;
+            this.cart.customer_id = customer.id;
+            if (customer.price_list_id && customer.price_list_id !== this.cart.price_list_id) {
+                this.cart.price_list_id = customer.price_list_id;
+                this.notice = `Price list changed for ${customer.name}.`;
+            }
+            this.showCustomer = false;
+            this.changed();
+            this.focusSearch();
+        },
+
+        clearCustomer() {
+            this.customer = null;
+            this.cart.customer_id = null;
+            if (this.isCredit) this.cart.payment_method = 'cash';
+            this.changed();
+        },
+
+        /** Balance and limit of the customer on the bill (after a restore or recall). */
+        async refreshCustomer() {
+            const id = this.cart.customer_id;
+            if (!id) {
+                this.customer = null;
+                return;
+            }
+            if (this.customer?.id === id && this.customer.balance !== undefined) return;
+            try {
+                const data = await api(this.config.urls.customer.replace('__ID__', id));
+                if (this.cart.customer_id === id) this.customer = data.customer;
+            } catch {
+                this.customer = { id, name: `Customer #${id}` };
+            }
+        },
+
+        startQuickAdd() {
+            const term = this.customerQuery.trim();
+            const digits = term.replace(/\D+/g, '');
+            const isPhone = digits.length >= 9;
+            this.quickAdd = { name: isPhone ? '' : term, phone: isPhone ? digits : '', area: '', saving: false, error: null };
+            this.$nextTick(() => document.getElementById('quick-add-name')?.focus());
+        },
+
+        async saveQuickAdd() {
+            if (!this.quickAdd || this.quickAdd.saving) return;
+            this.quickAdd.saving = true;
+            this.quickAdd.error = null;
+            try {
+                const data = await api(this.config.urls.customers, { method: 'POST', body: { name: this.quickAdd.name, phone: this.quickAdd.phone, area: this.quickAdd.area } });
+                this.quickAdd = null;
+                this.selectCustomer(data.customer);
+                this.notice = `${data.customer.name} added (${data.customer.code}). No credit until the manager sets a limit.`;
+            } catch (error) {
+                if (this.quickAdd) {
+                    this.quickAdd.error = error instanceof ApiError ? error.first : error.message;
+                    this.quickAdd.saving = false;
+                }
+            }
+        },
+
+        setMethod(method) {
+            if (method === 'credit' && !this.cart.customer_id) {
+                this.error = 'Choose the customer (F4) for a credit sale.';
+                this.openCustomer();
+                return;
+            }
+            this.cart.payment_method = method;
+            if (method !== 'cash') this.cart.tendered = '';
+            this.changed();
+            if (method === 'cash') this.openTender();
+        },
+
+        // ------------------------------------------------------------------ quotations (F7)
+
+        async quote() {
+            if (this.cart.lines.length === 0) {
+                this.openQuotations();
+                return;
+            }
+            if (this.quoting) return;
+
+            const name = this.cart.customer_id ? '' : window.prompt('Quotation. Customer name (optional):', '');
+            if (name === null) return;
+
+            this.quoting = true;
+            this.error = null;
+            this.quoteKey ??= randomKey();
+            clearTimeout(this.syncTimer);
+
+            try {
+                const data = await api(this.config.urls.quotations, { method: 'POST', body: { ...this.payload(), customer_name: name || null, idempotency_key: this.quoteKey } });
+                this.quoteKey = null;
+                this.notice = `Quotation ${data.quotation.number} printed (valid until ${data.quotation.valid_until}). Load it with F7 when the customer comes back.`;
+                if (data.print_url) printPage(data.print_url);
+                this.clearCart(false);
+            } catch (error) {
+                this.error = error instanceof ApiError ? error.first : error.message;
+            } finally {
+                this.quoting = false;
+            }
+        },
+
+        async openQuotations() {
+            this.showQuotations = true;
+            await this.searchQuotations();
+            this.$nextTick(() => this.$refs.quotationSearch?.focus());
+        },
+
+        async searchQuotations() {
+            try {
+                const data = await api(`${this.config.urls.quotations}?q=${encodeURIComponent(this.quotationQuery.trim())}`);
+                this.quotations = data.quotations ?? [];
+            } catch (error) {
+                this.error = error.message;
+            }
+        },
+
+        async loadQuotation(quotation) {
+            if (this.cart.lines.length > 0) {
+                this.error = 'Print, hold or clear the current bill first.';
+                return;
+            }
+            try {
+                const data = await api(this.config.urls.quotation_cart.replace('__ID__', quotation.id));
+                this.showQuotations = false;
+                await this.loadCart(data.cart);
+                const total = Number(this.server?.total ?? 0);
+                this.notice = Math.abs(total - Number(quotation.total)) > 0.004
+                    ? `${quotation.number} loaded. Prices changed since the quotation: Rs. ${money(quotation.total)} → Rs. ${money(total)}.`
+                    : `${quotation.number} loaded. Take payment and print the invoice (F9).`;
+            } catch (error) {
+                this.error = error instanceof ApiError ? error.first : error.message;
+            }
+        },
+
+        async reprintQuotation(quotation) {
+            try {
+                const data = await api(this.config.urls.quotation_reprint.replace('__ID__', quotation.id), { method: 'POST' });
+                printPage(data.print_url);
+                this.notice = `Reprinting ${quotation.number} (COPY).`;
+            } catch (error) {
+                this.error = error instanceof ApiError ? error.first : error.message;
+            }
         },
 
         keydown(event) {

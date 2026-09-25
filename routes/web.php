@@ -23,6 +23,8 @@ use App\Http\Controllers\Catalog\ProductImportController;
 use App\Http\Controllers\Catalog\SearchSynonymController;
 use App\Http\Controllers\Catalog\TaxController;
 use App\Http\Controllers\Catalog\UnitController;
+use App\Http\Controllers\Customers\CustomerController;
+use App\Http\Controllers\Customers\CustomerPaymentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Inventory\StockController;
@@ -33,16 +35,20 @@ use App\Http\Controllers\Pos\ApprovalController;
 use App\Http\Controllers\Pos\CartController;
 use App\Http\Controllers\Pos\CashierController;
 use App\Http\Controllers\Pos\CounterController;
+use App\Http\Controllers\Pos\CustomerController as PosCustomerController;
 use App\Http\Controllers\Pos\DrawerController;
 use App\Http\Controllers\Pos\HandoverController;
 use App\Http\Controllers\Pos\HoldController;
 use App\Http\Controllers\Pos\InvoiceController;
 use App\Http\Controllers\Pos\PrintController;
+use App\Http\Controllers\Pos\QuotationController as PosQuotationController;
 use App\Http\Controllers\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Purchasing\SupplierController;
 use App\Http\Controllers\Purchasing\SupplierReturnController;
 use App\Http\Controllers\SaleController;
+use App\Http\Controllers\Sales\QuotationController;
+use App\Http\Controllers\Sales\SaleReturnController;
 use App\Http\Controllers\UnregisteredTerminalController;
 use Illuminate\Support\Facades\Route;
 
@@ -88,6 +94,15 @@ Route::middleware('auth')->group(function () {
             Route::post('holds/{sale}/recall', [HoldController::class, 'recall'])->name('holds.recall');
 
             Route::post('approvals', [ApprovalController::class, 'store'])->name('approvals.store');
+
+            // Phase 4: customers (F4) and quotations (F7) on the counter screen.
+            Route::get('customers', [PosCustomerController::class, 'index'])->name('customers.index');
+            Route::post('customers', [PosCustomerController::class, 'store'])->name('customers.store');
+            Route::get('customers/{customer}', [PosCustomerController::class, 'show'])->name('customers.show');
+            Route::get('quotations', [PosQuotationController::class, 'index'])->name('quotations.index');
+            Route::post('quotations', [PosQuotationController::class, 'store'])->name('quotations.store');
+            Route::get('quotations/{quotation}/cart', [PosQuotationController::class, 'cart'])->name('quotations.cart');
+            Route::post('quotations/{quotation}/reprint', [PosQuotationController::class, 'reprint'])->name('quotations.reprint');
         });
     });
 
@@ -95,6 +110,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/pos/sales/{sale}/invoice', [PrintController::class, 'invoice'])->name('pos.sales.invoice');
         Route::get('/pos/printers/test-page', [PrintController::class, 'testPage'])->name('pos.printers.test-page');
         Route::post('/api/pos/print-jobs/{printJob}/printed', [PrintController::class, 'printed'])->name('api.pos.print-jobs.printed');
+        Route::get('/pos/customer-payments/{customerPayment}/receipt', [PrintController::class, 'paymentReceipt'])->name('pos.customer-payments.receipt');
+        Route::get('/pos/returns/{saleReturn}/receipt', [PrintController::class, 'returnReceipt'])->name('pos.returns.receipt');
+        Route::get('/pos/quotations/{quotation}/print', [PrintController::class, 'quotation'])->name('pos.quotations.print');
+        Route::get('/pos/sales/{sale}/credit-bill', [PrintController::class, 'creditBill'])->name('pos.sales.credit-bill');
     });
     Route::get('/pos/sales/{sale}/invoice.pdf', [PrintController::class, 'invoicePdf'])->name('pos.sales.invoice-pdf');
 
@@ -115,6 +134,19 @@ Route::middleware('auth')->group(function () {
             Route::get('handover', [HandoverController::class, 'create'])->middleware('can:drawer.handover')->name('handover.create');
             Route::post('handover', [HandoverController::class, 'store'])->middleware('can:drawer.handover')->name('handover.store');
             Route::post('sales/{sale}/void', [CashierController::class, 'void'])->middleware('can:pos.void')->name('sales.void');
+            Route::post('sales/{sale}/credit-bill/reprint', [PrintController::class, 'reprintCreditBill'])->middleware('can:pos.settle')->name('sales.credit-bill.reprint');
+
+            // Phase 4: money in and out that goes through the drawer.
+            Route::middleware('can:customers.credit.manage')->group(function () {
+                Route::get('customer-payment', [CustomerPaymentController::class, 'create'])->name('customer-payments.create');
+                Route::post('customers/{customer}/payments', [CustomerPaymentController::class, 'store'])->name('customer-payments.store');
+                Route::post('customer-payments/{customerPayment}/reprint', [CustomerPaymentController::class, 'reprint'])->name('customer-payments.reprint');
+            });
+            Route::middleware('can:pos.refund')->group(function () {
+                Route::get('returns/create', [SaleReturnController::class, 'create'])->name('returns.create');
+                Route::post('sales/{sale}/returns', [SaleReturnController::class, 'store'])->name('returns.store');
+                Route::post('returns/{saleReturn}/reprint', [SaleReturnController::class, 'reprint'])->name('returns.reprint');
+            });
         });
     });
 
@@ -131,7 +163,21 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/live-billing/snapshot', LiveBillingSnapshotController::class)->middleware('can:pos.live_view')->name('api.live-billing.snapshot');
 
     Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
+    Route::get('/sales/returns', [SaleReturnController::class, 'index'])->name('sales.returns.index');
+    Route::get('/sales/returns/{saleReturn}', [SaleReturnController::class, 'show'])->name('sales.returns.show');
     Route::get('/sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
+
+    Route::get('/quotations', [QuotationController::class, 'index'])->name('quotations.index');
+    Route::get('/quotations/{quotation}', [QuotationController::class, 'show'])->name('quotations.show');
+    Route::get('/quotations/{quotation}/pdf', [QuotationController::class, 'pdf'])->name('quotations.pdf');
+    Route::post('/quotations/{quotation}/cancel', [QuotationController::class, 'cancel'])->name('quotations.cancel');
+
+    Route::get('/customers-ageing', [CustomerController::class, 'ageing'])->name('customers.ageing');
+    Route::get('/customer-payments', [CustomerPaymentController::class, 'index'])->name('customers.payments.index');
+    Route::get('/customer-payments/{customerPayment}', [CustomerPaymentController::class, 'show'])->name('customers.payments.show');
+    Route::get('/customers/{customer}/statement.pdf', [CustomerController::class, 'statement'])->name('customers.statement');
+    Route::get('/api/customers', [CustomerController::class, 'lookup'])->name('api.customers');
+    Route::resource('customers', CustomerController::class);
 
     Route::prefix('catalog')->name('catalog.')->group(function () {
         Route::get('products/export', [ProductImportController::class, 'export'])->name('products.export');

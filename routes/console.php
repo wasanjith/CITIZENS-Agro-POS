@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\CashDrawer\Jobs\ProcessExpiredDelegationsJob;
+use App\Domain\Customers\Jobs\OverdueCreditReminderJob;
 use App\Domain\Identity\Actions\SaveUserAction;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Inventory\Actions\PostOpeningStockAction;
@@ -50,3 +51,4 @@ Schedule::job(new LowStockAndExpiryAlertJob)->dailyAt('07:00');
 Schedule::job(new ProcessExpiredDelegationsJob)->everyMinute();
 Schedule::job(new PruneCounterEventsJob)->dailyAt('02:30');
 Schedule::job(new RecalculateSalesVelocityJob)->dailyAt('02:45');
+Schedule::job(new OverdueCreditReminderJob)->dailyAt('07:05');

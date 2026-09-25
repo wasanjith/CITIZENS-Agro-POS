@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Domain\Catalog\Models\OpeningStockEntry;
+use App\Domain\Customers\Models\CustomerPayment;
 use App\Domain\Identity\Services\CashierAuthority;
 use App\Domain\Identity\Services\DelegationService;
 use App\Domain\Identity\Support\CurrentTerminal;
@@ -12,6 +13,7 @@ use App\Domain\Purchasing\Models\GoodsReceipt;
 use App\Domain\Purchasing\Models\PurchaseOrder;
 use App\Domain\Purchasing\Models\SupplierReturn;
 use App\Domain\Sales\Models\Sale;
+use App\Domain\Sales\Models\SaleReturn;
 use App\Domain\System\Services\Settings;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -48,6 +50,8 @@ class AppServiceProvider extends ServiceProvider
             'goods_receipt' => GoodsReceipt::class,
             'supplier_return' => SupplierReturn::class,
             'sale' => Sale::class,
+            'sale_return' => SaleReturn::class,
+            'customer_payment' => CustomerPayment::class,
         ]);
 
         $this->registerGates();

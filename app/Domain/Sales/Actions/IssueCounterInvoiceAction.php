@@ -8,11 +8,13 @@ use App\Domain\Inventory\Services\StockService;
 use App\Domain\Sales\Enums\CounterEventType;
 use App\Domain\Sales\Enums\PaymentMethod;
 use App\Domain\Sales\Enums\PrintDocumentType;
+use App\Domain\Sales\Enums\QuotationStatus;
 use App\Domain\Sales\Enums\SaleStatus;
 use App\Domain\Sales\Events\InvoiceIssued;
 use App\Domain\Sales\Models\ApprovalRequest;
 use App\Domain\Sales\Models\CounterEvent;
 use App\Domain\Sales\Models\PrintJob;
+use App\Domain\Sales\Models\Quotation;
 use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Models\SaleItem;
 use App\Domain\Sales\Services\CartPricer;
@@ -98,6 +100,10 @@ class IssueCounterInvoiceAction
             throw ValidationException::withMessages(['payment_method' => "{$method->label()} is not available yet."]);
         }
 
+        if ($method === PaymentMethod::Credit && $priced['customer_id'] === null) {
+            throw ValidationException::withMessages(['customer_id' => 'Choose the customer (F4) for a credit sale.']);
+        }
+
         if ($method === PaymentMethod::Cash) {
             if ($priced['tendered'] === null) {
                 throw ValidationException::withMessages(['tendered' => 'Enter the amount the customer gave (F6).']);
@@ -125,9 +131,15 @@ class IssueCounterInvoiceAction
             $reservations[$index] = $this->stock->reserve($products[$line['product_id']], $line['variant_id'], $line['base_qty']);
         }
 
+        $quotation = $priced['quotation_id'] !== null
+            ? Quotation::query()->lockForUpdate()->whereKey($priced['quotation_id'])->where('status', QuotationStatus::Open)->first()
+            : null;
+
         $sale = Sale::create([
             'invoice_no' => $this->numbers->next('SALE'),
             'status' => SaleStatus::Invoiced,
+            'customer_id' => $priced['customer_id'],
+            'quotation_id' => $quotation?->id,
             'price_list_id' => $priced['price_list_id'],
             'cart_uuid' => $priced['cart_uuid'] ?: (string) str()->uuid(),
             'invoiced_by' => $user->id,
@@ -180,6 +192,8 @@ class IssueCounterInvoiceAction
         if ($approvalIds !== []) {
             ApprovalRequest::query()->whereIn('id', $approvalIds)->update(['sale_id' => $sale->id]);
         }
+
+        $quotation?->forceFill(['status' => QuotationStatus::Converted, 'converted_sale_id' => $sale->id, 'converted_at' => now()])->save();
 
         $event = $this->recorder->record($terminal->id, $user->id, CounterEventType::Printed, $sale->cart_uuid, [
             'total' => $sale->total,

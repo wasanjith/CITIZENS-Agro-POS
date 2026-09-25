@@ -24,14 +24,32 @@ enum PaymentMethod: string
     }
 
     /**
-     * Methods a counter can choose in Phase 3. Credit needs customer accounts (Phase 4);
-     * split payments come with cheques and bank accounts (Phase 5).
+     * Methods a counter can choose. Credit needs a customer on the bill; split payments
+     * come with cheques and bank accounts (Phase 5).
      *
      * @return list<self>
      */
     public static function counterMethods(): array
     {
+        return [self::Cash, self::Card, self::BankTransfer, self::Cheque, self::Credit];
+    }
+
+    /**
+     * How a customer can pay towards their credit account.
+     *
+     * @return list<self>
+     */
+    public static function customerPaymentMethods(): array
+    {
         return [self::Cash, self::Card, self::BankTransfer, self::Cheque];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function customerPaymentOptions(): array
+    {
+        return collect(self::customerPaymentMethods())->mapWithKeys(fn (self $method) => [$method->value => $method->label()])->all();
     }
 
     /**
@@ -48,5 +66,13 @@ enum PaymentMethod: string
     public function needsConfirmation(): bool
     {
         return $this !== self::Cash;
+    }
+
+    /**
+     * Card, bank transfer and cheque need a slip / transfer / cheque number.
+     */
+    public function needsReference(): bool
+    {
+        return in_array($this, [self::Card, self::BankTransfer, self::Cheque], true);
     }
 }

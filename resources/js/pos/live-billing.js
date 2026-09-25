@@ -1,4 +1,4 @@
-import { api, ApiError, beep, isLive, money, onLiveChange, qty, randomKey } from './client';
+import { api, ApiError, beep, isLive, money, onLiveChange, printPage, qty, randomKey } from './client';
 
 /**
  * Live Billing: the three counters in real time.
@@ -29,6 +29,8 @@ export default function liveBilling(config) {
         settleMethod: 'cash',
         settleReference: '',
         settleKey: null,
+        settleCustomer: null,
+        overrideCredit: false,
         voiding: null,
         voidReason: '',
         busy: false,
@@ -243,7 +245,10 @@ export default function liveBilling(config) {
             this.settleMethod = sale.payment_method;
             this.settleReference = '';
             this.settleKey = randomKey();
-            this.$nextTick(() => document.getElementById(this.settleMethod === 'cash' ? 'settle-confirm' : 'settle-reference')?.focus());
+            this.settleCustomer = null;
+            this.overrideCredit = false;
+            if (sale.customer_id) this.loadSettleCustomer(sale.customer_id);
+            this.$nextTick(() => document.getElementById(['cash', 'credit'].includes(this.settleMethod) ? 'settle-confirm' : 'settle-reference')?.focus());
         },
 
         async settle() {
@@ -254,7 +259,7 @@ export default function liveBilling(config) {
 
             try {
                 const url = this.config.urls.settle.replace('__ID__', sale.id);
-                const data = await api(url, { method: 'POST', body: { method: this.settleMethod, reference: this.settleReference || null, idempotency_key: this.settleKey } });
+                const data = await api(url, { method: 'POST', body: { method: this.settleMethod, reference: this.settleReference || null, override_credit_limit: this.overrideCredit, idempotency_key: this.settleKey } });
                 this.settling = null;
                 this.dropInvoice(sale);
                 this.flash = { ...this.flash, [sale.terminal_id]: Date.now() + 4000 };
@@ -262,6 +267,12 @@ export default function liveBilling(config) {
 
                 if (data.open_drawer && this.config.has_drawer) {
                     this.openDrawer();
+                }
+                if (data.credit_bill_url) {
+                    this.notice = `${sale.invoice_no} put on ${sale.customer?.name ?? 'the customer'}'s account. The credit bill is printing: get the customer's signature and stamp the shop seal.`;
+                    printPage(data.credit_bill_url).then((ok) => {
+                        if (!ok) this.error = `Check printer: the credit bill of ${sale.invoice_no} was not confirmed as printed. Reprint it from the invoice page.`;
+                    });
                 }
                 this.refreshSoon();
             } catch (error) {
@@ -274,6 +285,21 @@ export default function liveBilling(config) {
                 this.busy = false;
                 this.$nextTick(() => this.$refs.find?.focus());
             }
+        },
+
+        async loadSettleCustomer(id) {
+            try {
+                const { customer } = await api(this.config.urls.customer.replace('__ID__', id));
+                if (this.settling?.customer_id === id) this.settleCustomer = customer;
+            } catch {
+                // The settle card still works without the balance.
+            }
+        },
+
+        /** Credit settlement would take the customer over their limit. */
+        get overLimit() {
+            if (this.settleMethod !== 'credit' || !this.settleCustomer || !this.settling) return false;
+            return Number(this.settleCustomer.balance) + Number(this.settling.total) > Number(this.settleCustomer.credit_limit) + 0.001;
         },
 
         async openDrawer() {

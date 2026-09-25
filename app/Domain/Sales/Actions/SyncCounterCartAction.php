@@ -146,6 +146,10 @@ class SyncCounterCartAction
             }
         }
 
+        if (($current['customer_id'] ?? null) !== ($previous['customer_id'] ?? null) && ($current['customer'] ?? null) !== null) {
+            $record(CounterEventType::CustomerSet, ['customer_id' => $current['customer_id'], 'name' => $current['customer']['name']]);
+        }
+
         $tendered = $current['tendered'];
         $oldTendered = $previous['tendered'] ?? null;
 

@@ -584,14 +584,15 @@ quotations (+ lines): id, number, customer_id null, valid_until, status enum(OPE
 ```
 
 ### Work items
-- [ ] Customer pages (list, create/edit, show with ledger, outstanding invoices, ageing).
-- [ ] Customer quick-add and search from POS (F4) — by phone, name, NIC, village.
-- [ ] Price list per customer applied automatically in the cart.
-- [ ] **Credit sale:** counter selects a customer and method CREDIT (no tendered amount); the invoice prints marked "ණයට / CREDIT". At settlement the cashier confirms it: allowed if within `credit_limit` (override requires Super Admin approval) → customer ledger debit with due date.
-- [ ] Receive customer payment page (main cashier: cash/bank/cheque), allocate to oldest invoices (FIFO) or manually; prints Sinhala payment receipt on printer #0.
-- [ ] Customer statement PDF (Sinhala/English).
-- [ ] **Returns** (`pos.refund`): find invoice → pick lines/qty → restock yes/no (damaged goods → no restock, DAMAGE movement) → refund cash / credit note / reduce account balance → Sinhala return receipt.
-- [ ] Quotations: create from the counter cart, print on the counter printer / PDF, convert to bill.- [ ] Overdue credit reminders (optional SMS gateway integration behind a `SmsChannel` interface).
+- [x] Customer pages (list, create/edit, show with ledger, outstanding invoices, ageing). *(Plus a credit ageing report for all customers. Customer numbers `C-00001`; an opening balance from the old books can be entered when the customer is created.)*
+- [x] Customer quick-add and search from POS (F4) — by phone, name, NIC, village. *(Quick-add takes name, phone and village; the credit limit stays 0 until the Owner or Manager sets one.)*
+- [x] Price list per customer applied automatically in the cart.
+- [x] **Credit sale:** counter selects a customer and method CREDIT (no tendered amount); the invoice prints marked "ණයට / CREDIT". At settlement the cashier confirms it: allowed if within `credit_limit` (override requires Super Admin approval) → customer ledger debit with due date. *(Settling it also prints a **credit bill** on printer #0 for the customer's signature, the owner's signature and the shop seal; the shop keeps it. The override is a tick box only the Super Admin sees; a delegated Manager can never go over a limit. The invoice's `balance_due` holds what is still owed on it.)*
+- [x] Receive customer payment page (main cashier: cash/bank/cheque), allocate to oldest invoices (FIFO) or manually; prints Sinhala payment receipt on printer #0. *(Cash, card, bank transfer, cheque; real cheque records come with Phase 5. Money not applied stays as an advance. Cash is part of the drawer's expected cash and the Z report.)*
+- [x] Customer statement PDF (Sinhala/English).
+- [x] **Returns** (`pos.refund`): find invoice → pick lines/qty → restock yes/no (damaged goods → no restock, DAMAGE movement) → refund cash / credit note / reduce account balance → Sinhala return receipt. *(Two refund methods: cash from the drawer, or credit to the customer's account, which first lowers what is owed on that invoice; "credit note" = credit to account. Stock goes back into the batches the sale was issued from. A line's refund is its share of the invoice after the bill discount.)*
+- [x] Quotations: create from the counter cart, print on the counter printer / PDF, convert to bill. *(F7. Loading a quotation reprices it at today's prices and says so if the total changed.)*
+- [x] Overdue credit reminders (optional SMS gateway integration behind a `SmsChannel` interface). *(Daily 07:05 bell notification to Owner/Manager. No SMS: the owner does not want it.)*
 
 ### Tests
 - Credit limit enforcement; payment allocation; ledger balance = sum of debits − credits.

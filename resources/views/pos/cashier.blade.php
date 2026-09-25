@@ -13,6 +13,12 @@
 
 @section('pos-status')
     <span class="hidden items-center gap-1 sm:flex">
+        @can('customers.credit.manage')
+            <a href="{{ route('pos.customer-payments.create') }}" class="rounded bg-white/10 px-2 py-1 text-xs hover:bg-white/20">Customer payment</a>
+        @endcan
+        @can('pos.refund')
+            <a href="{{ route('pos.returns.create') }}" class="rounded bg-white/10 px-2 py-1 text-xs hover:bg-white/20">Return</a>
+        @endcan
         @can('drawer.handover')
             <a href="{{ route('pos.handover.create') }}" class="rounded bg-white/10 px-2 py-1 text-xs hover:bg-white/20">Hand over</a>
         @else

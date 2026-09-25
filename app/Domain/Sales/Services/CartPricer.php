@@ -6,6 +6,7 @@ use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductUnit;
 use App\Domain\Catalog\Services\PriceBook;
+use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Support\Qty;
 use App\Domain\Sales\Enums\ApprovalStatus;
 use App\Domain\Sales\Enums\ApprovalType;
@@ -25,7 +26,8 @@ use Illuminate\Validation\ValidationException;
  * approved requests, and totals are recomputed.
  *
  * Input (from the POS screen):
- *   cart_uuid, price_list_id, payment_method, tendered, bill_discount, bill_approval_request_id,
+ *   cart_uuid, price_list_id, customer_id, quotation_id, payment_method, tendered,
+ *   bill_discount, bill_approval_request_id,
  *   lines: [{key, product_id, variant_id, unit_id, qty, discount, approval_request_id}]
  *
  * strict = true (printing an invoice): anything wrong throws a ValidationException.
@@ -47,6 +49,7 @@ class CartPricer
     {
         $cartUuid = (string) ($cart['cart_uuid'] ?? '');
         $priceListId = (int) ($cart['price_list_id'] ?? 0) ?: (int) PriceList::default()?->id;
+        $customer = $this->customer($cart, $strict);
         $rawLines = array_values(array_filter((array) ($cart['lines'] ?? []), 'is_array'));
 
         $productIds = array_values(array_unique(array_map(fn (array $line) => (int) ($line['product_id'] ?? 0), $rawLines)));
@@ -139,6 +142,9 @@ class CartPricer
         return [
             'cart_uuid' => $cartUuid,
             'price_list_id' => $priceListId,
+            'customer_id' => $customer?->id,
+            'customer' => $customer !== null ? ['id' => $customer->id, 'code' => $customer->code, 'name' => $customer->name, 'phone' => $customer->phone] : null,
+            'quotation_id' => isset($cart['quotation_id']) && $cart['quotation_id'] !== '' ? (int) $cart['quotation_id'] : null,
             'lines' => $lines,
             'subtotal' => (string) $subtotal,
             'line_discount_total' => (string) $lineDiscounts,
@@ -237,6 +243,28 @@ class CartPricer
             '_gross' => $gross,
             '_tax_rate' => $taxRate,
         ];
+    }
+
+    /**
+     * The customer on the bill, if any. It must exist and be active.
+     *
+     * @param  array<string, mixed>  $cart
+     */
+    private function customer(array $cart, bool $strict): ?Customer
+    {
+        $id = (int) ($cart['customer_id'] ?? 0);
+
+        if ($id === 0) {
+            return null;
+        }
+
+        $customer = Customer::query()->find($id);
+
+        if ($customer === null || ! $customer->is_active) {
+            return $this->fail($strict, 'customer_id', 'This customer is not active. Choose another customer (F4).');
+        }
+
+        return $customer;
     }
 
     /**

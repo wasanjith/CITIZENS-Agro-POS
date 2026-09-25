@@ -25,6 +25,8 @@ class CartRequest extends FormRequest
         return [
             'cart_uuid' => ['required', 'uuid'],
             'price_list_id' => ['nullable', 'integer', 'exists:price_lists,id'],
+            'customer_id' => ['nullable', 'integer'],
+            'quotation_id' => ['nullable', 'integer'],
             'payment_method' => ['nullable', Rule::enum(PaymentMethod::class)],
             'tendered' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'bill_discount' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
@@ -45,6 +47,6 @@ class CartRequest extends FormRequest
      */
     public function cart(): array
     {
-        return $this->safe()->only(['cart_uuid', 'price_list_id', 'payment_method', 'tendered', 'bill_discount', 'bill_approval_request_id', 'lines']);
+        return $this->safe()->only(['cart_uuid', 'price_list_id', 'customer_id', 'quotation_id', 'payment_method', 'tendered', 'bill_discount', 'bill_approval_request_id', 'lines']);
     }
 }

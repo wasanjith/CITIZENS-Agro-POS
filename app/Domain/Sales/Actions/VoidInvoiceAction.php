@@ -4,6 +4,8 @@ namespace App\Domain\Sales\Actions;
 
 use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Customers\Enums\CustomerLedgerType;
+use App\Domain\Customers\Services\CustomerLedger;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\Batch;
 use App\Domain\Inventory\Services\StockService;
@@ -35,6 +37,7 @@ class VoidInvoiceAction
         private readonly StockService $stock,
         private readonly CounterEventRecorder $recorder,
         private readonly LiveCartStore $store,
+        private readonly CustomerLedger $ledger,
     ) {}
 
     public function handle(Sale $sale, User $user, string $reason, ?DrawerSession $session = null): Sale
@@ -91,13 +94,22 @@ class VoidInvoiceAction
     private function reverseSettlement(Sale $sale, User $user, string $reason, ?DrawerSession $session): void
     {
         if ($sale->settled_at === null || ! $sale->settled_at->isToday()) {
-            throw ValidationException::withMessages(['sale' => 'Only sales settled today can be voided. Use a sale return (Phase 4) for older sales.']);
+            throw ValidationException::withMessages(['sale' => 'Only sales settled today can be voided. Use a sale return for older sales.']);
         }
 
         $session = $session !== null ? DrawerSession::query()->lockForUpdate()->find($session->id) : null;
 
         if ($session === null || ! $session->isOpen() || $session->holder_user_id !== $user->id) {
             throw ValidationException::withMessages(['drawer' => 'Open your drawer first: the refund is paid out of it.']);
+        }
+
+        if ($sale->allocations()->exists()) {
+            throw ValidationException::withMessages(['sale' => "The customer has already paid towards {$sale->invoice_no}. Use a sale return instead."]);
+        }
+
+        if ($sale->isCreditSale() && (float) $sale->balance_due > 0) {
+            $this->ledger->credit((int) $sale->customer_id, CustomerLedgerType::Adjustment, $sale, $sale->balance_due, today(), $user->id, "Void: {$reason}");
+            $sale->forceFill(['balance_due' => '0.00'])->save();
         }
 
         $products = Product::query()->whereIn('id', $sale->items->pluck('product_id'))->get()->keyBy('id');
@@ -144,6 +156,7 @@ class VoidInvoiceAction
             'reason' => $sale->void_reason,
             'cart' => [
                 'price_list_id' => $sale->price_list_id,
+                'customer_id' => $sale->customer_id,
                 'payment_method' => $sale->payment_method_intent->value,
                 'bill_discount' => $sale->bill_discount,
                 'lines' => $sale->items->map(fn (SaleItem $item) => [

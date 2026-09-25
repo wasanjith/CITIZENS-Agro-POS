@@ -81,6 +81,20 @@
         </tbody>
     </table>
 
+    @if ($report['customer_payments'] !== [] || $report['returns'] !== [])
+        <h2>{{ $t('customer_payments') }} · {{ $t('returns') }}</h2>
+        <table>
+            <tbody>
+                @foreach ($report['customer_payments'] as $method => $row)
+                    <tr><td>{{ $t('customer_payments') }}: {{ $t('method_'.$method) }}</td><td class="num">{{ $row['count'] }}</td><td class="num">{{ $money($row['amount']) }}</td></tr>
+                @endforeach
+                @foreach ($report['returns'] as $method => $row)
+                    <tr><td>{{ $t('returns') }}: {{ $t('refund_'.$method) }}</td><td class="num">{{ $row['count'] }}</td><td class="num">-{{ $money($row['total']) }}</td></tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
     <h2>{{ $t('voids') }} ({{ $report['void_count'] }})</h2>
     <table>
         <tbody>

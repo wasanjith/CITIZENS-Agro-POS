@@ -33,6 +33,9 @@
 @if (! empty($invoice['is_void']))
     <div class="center" style="margin-top: 2mm"><span class="badge">{{ $t('void') }}</span></div>
 @endif
+@if (! empty($invoice['is_credit']))
+    <div class="center" style="margin-top: 2mm"><span class="badge">{{ __('receipt.credit_invoice', [], 'si') }} / {{ __('receipt.credit_invoice', [], 'en') }}</span></div>
+@endif
 
 <hr class="rule">
 
@@ -41,6 +44,10 @@
 <div class="row"><span>{{ $t('counter') }}</span><span class="num">{{ $invoice['counter'] }}</span></div>
 @if ($receipt['show_staff_name'])
     <div class="row"><span>{{ $t('staff') }}</span><span>{{ $invoice['staff'] }}</span></div>
+@endif
+@if (! empty($invoice['customer']))
+    <div class="row"><span>{{ $t('customer') }}</span><span>{{ $primary === 'si' ? ($invoice['customer']['name_si'] ?: $invoice['customer']['name']) : $invoice['customer']['name'] }}</span></div>
+    <div class="row muted"><span>{{ $invoice['customer']['code'] }}</span><span class="num">{{ $invoice['customer']['phone'] }}</span></div>
 @endif
 
 <hr class="rule">
@@ -70,6 +77,12 @@
     @if ($isCash)
         <div class="row"><span>{{ $t('paid_cash') }}</span><span class="num">{{ $money($invoice['tendered']) }}</span></div>
         <div class="row grand-total"><span>{{ $t('balance') }}</span><span class="num">{{ $money($invoice['balance']) }}</span></div>
+    @elseif (! empty($invoice['is_credit']))
+        <div class="row"><span>{{ $t('paid') }}</span><span class="num">{{ $money(0) }}</span></div>
+        <div class="row grand-total"><span>{{ $t('to_pay') }} ({{ $t('credit') }})</span><span class="num">{{ $money($invoice['total']) }}</span></div>
+        @if (! empty($invoice['due_date']))
+            <div class="row"><span>{{ $t('due_date') }}</span><span class="num">{{ $invoice['due_date']->format('Y-m-d') }}</span></div>
+        @endif
     @else
         <div class="row"><span>{{ $t('paid') }} ({{ $t('method_'.$invoice['method']) }})</span><span class="num">{{ $money($invoice['tendered']) }}</span></div>
     @endif

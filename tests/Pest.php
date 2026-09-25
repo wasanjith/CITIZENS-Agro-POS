@@ -7,11 +7,14 @@ use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\Unit;
+use App\Domain\Customers\Models\Customer;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Identity\Models\Printer;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Identity\Services\TerminalRegistrar;
 use App\Domain\Inventory\Services\StockService;
+use App\Domain\Sales\Actions\IssueCounterInvoiceAction;
+use App\Domain\Sales\Models\Sale;
 use App\Models\User;
 use Brick\Math\BigDecimal;
 use Database\Seeders\CatalogSeeder;
@@ -22,6 +25,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /*
@@ -259,4 +263,32 @@ function openDrawer(Terminal $main, User $holder, int $thousands = 5): DrawerSes
 function atTerminal(string $token, User $user): TestCase
 {
     return test()->withCredentials()->withCookie(deviceCookie(), $token)->actingAs($user);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Customer helpers (Phase 4)
+|--------------------------------------------------------------------------
+*/
+
+function creditCustomer(string $limit = '50000', array $attributes = []): Customer
+{
+    return Customer::factory()->withCredit($limit)->create($attributes)->refresh();
+}
+
+/**
+ * Print an invoice at Counter 1 through the action. $extra goes into the cart
+ * (customer_id, payment_method, tendered, bill_discount …).
+ */
+function counterInvoice(array $pos, array $lines, array $extra = []): Sale
+{
+    return app(IssueCounterInvoiceAction::class)->handle($pos['counter'], $pos['staff'], cartPayload($lines, $extra), Str::random(32))['sale']->refresh();
+}
+
+/**
+ * POST settle on the main terminal as $user (who must hold the open drawer).
+ */
+function cashierSettle(array $pos, User $user, Sale $sale, array $extra = []): TestResponse
+{
+    return atTerminal($pos['mainToken'], $user)->postJson(route('api.pos.sales.settle', $sale), ['idempotency_key' => Str::random(32), ...$extra]);
 }

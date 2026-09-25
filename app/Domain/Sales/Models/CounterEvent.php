@@ -77,6 +77,7 @@ class CounterEvent extends Model
             CounterEventType::ItemAdded, CounterEventType::ItemRemoved => trim(($payload['qty'] ?? '').' '.($payload['unit'] ?? '').' '.($payload['name'] ?? '')),
             CounterEventType::QtyChanged => ($payload['name'] ?? '').' '.($payload['from'] ?? '').' → '.($payload['to'] ?? ''),
             CounterEventType::Tendered => 'Rs. '.number_format((float) ($payload['amount'] ?? 0), 2),
+            CounterEventType::CustomerSet => (string) ($payload['name'] ?? ''),
             CounterEventType::Printed, CounterEventType::Reprinted, CounterEventType::Settled, CounterEventType::Voided => (string) ($payload['invoice_no'] ?? ''),
             CounterEventType::CartCleared => ($payload['lines'] ?? 0).' lines · Rs. '.number_format((float) ($payload['total'] ?? 0), 2),
             default => '',

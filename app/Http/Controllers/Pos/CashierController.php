@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Domain\Identity\Enums\Role;
 use App\Domain\Identity\Support\CurrentTerminal;
 use App\Domain\Sales\Actions\SettleInvoiceAction;
 use App\Domain\Sales\Actions\VoidInvoiceAction;
@@ -41,6 +42,7 @@ class CashierController extends Controller
                 'methods' => PaymentMethod::counterOptions(),
                 'can_void' => $request->user()->can('pos.void'),
                 'can_approve' => $request->user()->can('pos.approve_requests'),
+                'can_override_credit' => $request->user()->hasRole(Role::SuperAdmin->value),
                 'sound' => (bool) $settings->get('pos.invoice_sound', false),
                 'focus_invoice' => $request->integer('invoice') ?: null,
                 'urls' => [
@@ -52,6 +54,7 @@ class CashierController extends Controller
                     'reject' => url('/api/pos/approvals/__ID__/reject'),
                     'invoice' => url('/pos/sales/__ID__/invoice'),
                     'sale' => url('/sales/__ID__'),
+                    'customer' => url('/api/pos/customers/__ID__'),
                 ],
             ],
         ]);
@@ -67,6 +70,7 @@ class CashierController extends Controller
         $validated = $request->validate([
             'method' => ['nullable', Rule::enum(PaymentMethod::class)],
             'reference' => ['nullable', 'string', 'max:100'],
+            'override_credit_limit' => ['nullable', 'boolean'],
             'idempotency_key' => ['required', 'string', 'min:16', 'max:64'],
         ]);
 
@@ -75,7 +79,7 @@ class CashierController extends Controller
             $request->user(),
             $this->currentTerminal->get(),
             $request->attributes->get('drawerSession'),
-            ['method' => $validated['method'] ?? null, 'reference' => $validated['reference'] ?? null],
+            ['method' => $validated['method'] ?? null, 'reference' => $validated['reference'] ?? null, 'override_credit_limit' => (bool) ($validated['override_credit_limit'] ?? false)],
             $validated['idempotency_key'],
         );
 
@@ -83,6 +87,7 @@ class CashierController extends Controller
             'sale' => $result['sale']->liveSummary(),
             'open_drawer' => $result['open_drawer'] && $result['created'],
             'created' => $result['created'],
+            'credit_bill_url' => $result['credit_bill'] !== null ? route('pos.sales.credit-bill', ['sale' => $result['sale'], 'job' => $result['credit_bill']->id]) : null,
         ]);
     }
 

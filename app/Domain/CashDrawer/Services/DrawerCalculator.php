@@ -6,11 +6,13 @@ use App\Domain\CashDrawer\Enums\CashMovementType;
 use App\Domain\CashDrawer\Enums\DrawerCloseReason;
 use App\Domain\CashDrawer\Models\CashMovement;
 use App\Domain\CashDrawer\Models\DrawerSession;
+use App\Domain\Customers\Models\CustomerPayment;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Sales\Enums\PaymentMethod;
 use App\Domain\Sales\Enums\SaleStatus;
 use App\Domain\Sales\Models\Payment;
 use App\Domain\Sales\Models\Sale;
+use App\Domain\Sales\Models\SaleReturn;
 use App\Domain\Sales\Support\Money;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -20,7 +22,8 @@ use Illuminate\Support\Collection;
  * Drawer arithmetic: expected cash, totals per payment method and per counter, and
  * the Z report for a day (a chain of sessions linked by handovers).
  *
- * expected cash = opening float + cash settled − cash refunded + pay ins − pay outs − safe drops − bank deposits
+ * expected cash = opening float + cash settled − cash refunded (voids, returns) + cash customer payments
+ *                 + pay ins − pay outs − safe drops − bank deposits
  */
 class DrawerCalculator
 {
@@ -58,8 +61,20 @@ class DrawerCalculator
             ->toBase()
             ->pluck('amount', 'type');
 
+        $cashIn = Payment::query()->where('drawer_session_id', $session->id)->where('method', PaymentMethod::Cash)->where('amount', '>', 0)->sum('amount');
+        $cashOut = Payment::query()->where('drawer_session_id', $session->id)->where('method', PaymentMethod::Cash)->where('amount', '<', 0)->sum('amount');
+
+        $customerPayments = CustomerPayment::query()
+            ->where('drawer_session_id', $session->id)
+            ->groupBy('method')
+            ->selectRaw('method, SUM(amount) AS amount, COUNT(*) AS count')
+            ->toBase()
+            ->get()
+            ->keyBy('method');
+        $customerCash = Money::of((string) ($customerPayments[PaymentMethod::Cash->value]->amount ?? '0'));
+
         $cash = Money::of((string) ($payments[PaymentMethod::Cash->value]->amount ?? '0'));
-        $expected = Money::of($session->opening_float)->plus($cash);
+        $expected = Money::of($session->opening_float)->plus($cash)->plus($customerCash);
 
         foreach (CashMovementType::cases() as $type) {
             $amount = Money::of((string) ($movements[$type->value] ?? '0'));
@@ -68,7 +83,17 @@ class DrawerCalculator
 
         return [
             'opening_float' => (string) Money::of($session->opening_float),
-            'cash_sales' => (string) $cash,
+            'cash_sales' => (string) Money::of((string) $cashIn),
+            'cash_refunds' => (string) Money::of((string) $cashOut)->abs(),
+            'customer_cash' => (string) $customerCash,
+            'customer_payments' => collect(PaymentMethod::customerPaymentMethods())
+                ->mapWithKeys(fn (PaymentMethod $method) => [$method->value => [
+                    'label' => $method->label(),
+                    'amount' => (string) Money::of((string) ($customerPayments[$method->value]->amount ?? '0')),
+                    'count' => (int) ($customerPayments[$method->value]->count ?? 0),
+                ]])
+                ->filter(fn (array $row) => $row['count'] > 0)
+                ->all(),
             'by_method' => collect(PaymentMethod::cases())
                 ->mapWithKeys(fn (PaymentMethod $method) => [$method->value => [
                     'label' => $method->label(),
@@ -199,6 +224,25 @@ class DrawerCalculator
             }
         }
 
+        $customerPayments = [];
+
+        foreach ($sessions as $session) {
+            foreach ($session['summary']['customer_payments'] as $method => $row) {
+                $customerPayments[$method] ??= ['label' => $row['label'], 'amount' => Money::zero(), 'count' => 0];
+                $customerPayments[$method]['amount'] = $customerPayments[$method]['amount']->plus($row['amount']);
+                $customerPayments[$method]['count'] += $row['count'];
+            }
+        }
+
+        $returns = SaleReturn::query()
+            ->whereIn('drawer_session_id', $ids)
+            ->groupBy('refund_method')
+            ->selectRaw('refund_method, COUNT(*) AS count, SUM(total) AS total')
+            ->toBase()
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->refund_method => ['count' => (int) $row->count, 'total' => (string) Money::of((string) $row->total)]])
+            ->all();
+
         $perCounter = $this->perCounter($ids);
         $voids = $this->voidsPerCounter($from, $to);
 
@@ -215,6 +259,8 @@ class DrawerCalculator
             'sales_total' => (string) $perCounter->reduce(fn (BigDecimal $sum, array $row) => $sum->plus($row['total']), Money::zero()),
             'sales_count' => $perCounter->sum('count'),
             'by_method' => array_map(fn (array $row) => [...$row, 'amount' => (string) $row['amount']], $byMethod),
+            'customer_payments' => array_map(fn (array $row) => [...$row, 'amount' => (string) $row['amount']], $customerPayments),
+            'returns' => $returns,
             'voids' => $voids->all(),
             'void_count' => $voids->sum('count'),
             'opening_float' => (string) Money::of($chain->first()->opening_float),

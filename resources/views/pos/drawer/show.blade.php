@@ -39,7 +39,7 @@
 
             <div class="grid gap-4 sm:grid-cols-4">
                 <x-ui.stat-tile label="Opening float" :value="$money($summary['opening_float'])" />
-                <x-ui.stat-tile label="Cash settled" :value="$money($summary['cash_sales'])" />
+                <x-ui.stat-tile label="Cash settled" :value="$money($summary['cash_sales'])" :hint="((float) $summary['cash_refunds'] > 0 ? 'Refunds -'.$money($summary['cash_refunds']).' · ' : '').((float) $summary['customer_cash'] > 0 ? 'Customer payments +'.$money($summary['customer_cash']) : '')" />
                 <x-ui.stat-tile label="Pay in / out / drops" :value="'+'.number_format((float) $summary['movements']['pay_in']['amount'], 2).' / -'.number_format((float) $summary['movements']['pay_out']['amount'] + (float) $summary['movements']['safe_drop']['amount'], 2)" />
                 <x-ui.stat-tile label="Expected in drawer" :value="$money($summary['expected_cash'])" />
             </div>

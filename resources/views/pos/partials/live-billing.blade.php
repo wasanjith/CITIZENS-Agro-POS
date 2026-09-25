@@ -117,10 +117,10 @@
                                         <dd class="text-right font-semibold tabular" x-text="money(sale.change_due)"></dd>
                                     </template>
                                     <template x-if="sale.payment_method !== 'cash'">
-                                        <dt class="col-span-2 text-amber-800" x-text="sale.payment_method_label + ' · confirm reference'"></dt>
+                                        <dt class="col-span-2 text-amber-800" x-text="sale.payment_method_label + (sale.payment_method === 'credit' ? ' · check the credit limit' : ' · confirm reference')"></dt>
                                     </template>
                                 </dl>
-                                <p class="mt-1 text-xs text-gray-500" x-text="sale.staff"></p>
+                                <p class="mt-1 text-xs text-gray-500"><span x-text="sale.staff"></span><span x-show="sale.customer" class="font-medium text-gray-700" x-text="' · ' + (sale.customer?.name ?? '')"></span></p>
                                 <div class="mt-2 flex gap-2" x-show="config.mode === 'cashier'">
                                     <x-ui.button size="sm" class="flex-1" @click="openSettle(sale)">Settle</x-ui.button>
                                     <x-ui.button size="sm" variant="secondary" class="text-red-700" @click="openVoid(sale)" x-show="config.can_void">Void</x-ui.button>
@@ -193,11 +193,32 @@
                         <label for="settle-method" class="block text-sm font-medium text-gray-700">Payment method</label>
                         <select id="settle-method" x-model="settleMethod" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
                             @foreach ($config['methods'] ?? [] as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
+                                <option value="{{ $value }}" @if ($value === 'credit') x-bind:disabled="!settling?.customer_id" @endif>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div x-show="settleMethod !== 'cash'">
+                    <template x-if="settling?.customer">
+                        <div class="rounded-md bg-gray-50 p-3 text-sm ring-1 ring-gray-200">
+                            <p><span class="font-semibold" x-text="settling.customer.name"></span> <span class="text-gray-500" x-text="settling.customer.code + (settling.customer.phone ? ' · ' + settling.customer.phone : '')"></span></p>
+                            <template x-if="settleCustomer">
+                                <dl class="mt-1 grid grid-cols-2 gap-x-2 text-xs text-gray-700">
+                                    <dt>Owes now</dt><dd class="text-right tabular" x-text="money(settleCustomer.balance)"></dd>
+                                    <dt>Credit limit</dt><dd class="text-right tabular" x-text="money(settleCustomer.credit_limit)"></dd>
+                                    <dt>Overdue</dt><dd class="text-right tabular" :class="Number(settleCustomer.overdue) > 0 ? 'font-semibold text-red-700' : ''" x-text="money(settleCustomer.overdue)"></dd>
+                                </dl>
+                            </template>
+                            <div x-show="overLimit" class="mt-2 rounded bg-red-50 p-2 text-xs text-red-800 ring-1 ring-red-200">
+                                Over the credit limit by Rs. <span class="tabular" x-text="money(Number(settleCustomer?.balance) + Number(settling?.total) - Number(settleCustomer?.credit_limit))"></span>.
+                                <template x-if="config.can_override_credit">
+                                    <label class="mt-1 flex items-center gap-2 font-medium"><input type="checkbox" x-model="overrideCredit" class="rounded text-red-600"> Allow it (owner)</label>
+                                </template>
+                                <template x-if="!config.can_override_credit">
+                                    <span class="block font-medium">Only the owner can allow it. Void and bill it as cash, or ask the owner.</span>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="settleMethod !== 'cash' && settleMethod !== 'credit'">
                         <label for="settle-reference" class="block text-sm font-medium text-gray-700">Reference (slip / transfer / cheque no.)</label>
                         <input id="settle-reference" x-model="settleReference" class="mt-1 block w-full rounded-md border-gray-300 text-sm" autocomplete="off">
                     </div>

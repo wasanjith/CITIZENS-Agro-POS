@@ -11,12 +11,13 @@
 >
     {{-- Hotkeys --}}
     <span class="hidden" x-hotkey.f2="focusSearch()"></span>
-    <span class="hidden" x-hotkey.f4="customer()"></span>
+    <span class="hidden" x-hotkey.f4="openCustomer()"></span>
     <span class="hidden" x-hotkey.f6="openTender()"></span>
+    <span class="hidden" x-hotkey.f7="quote()"></span>
     <span class="hidden" x-hotkey.f8="hold()"></span>
     <span class="hidden" x-hotkey.f9="print()"></span>
     <span class="hidden" x-hotkey.f10="reprintLast()"></span>
-    <span class="hidden" x-hotkey.escape="showInvoices || showHolds ? (showInvoices = showHolds = false) : (query ? (query = '', results = []) : clearCart())"></span>
+    <span class="hidden" x-hotkey.escape="showInvoices || showHolds || showCustomer || showQuotations ? (showInvoices = showHolds = showCustomer = showQuotations = false, focusSearch()) : (query ? (query = '', results = []) : clearCart())"></span>
 
     {{-- ============================== Left: search and quick grids ============================== --}}
     <section class="flex min-h-0 flex-col rounded-lg bg-white shadow-sm ring-1 ring-gray-200 lg:col-span-5">
@@ -141,7 +142,18 @@
                             <option :value="list.id" x-text="list.name" :selected="list.id === cart.price_list_id"></option>
                         </template>
                     </select>
-                    <button type="button" @click="customer()" class="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200">Customer (F4)</button>
+                    <template x-if="!customer">
+                        <button type="button" @click="openCustomer()" class="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200">Customer (F4)</button>
+                    </template>
+                    <template x-if="customer">
+                        <span class="flex items-center gap-1 rounded-md bg-violet-50 px-2 py-1 text-xs text-violet-900 ring-1 ring-violet-200">
+                            <button type="button" @click="openCustomer()" class="font-semibold" x-text="customer.name"></button>
+                            <span x-show="customer.balance !== undefined && Number(customer.balance) > 0" class="tabular" x-text="'owes ' + money(customer.balance)"></span>
+                            <span x-show="Number(customer.overdue) > 0" class="font-semibold text-red-700">overdue</span>
+                            <button type="button" @click="clearCustomer()" class="ml-1 leading-none text-violet-500 hover:text-violet-800" aria-label="Remove customer">&times;</button>
+                        </span>
+                    </template>
+                    <span x-show="cart.quotation_id" x-cloak class="rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-800 ring-1 ring-sky-200">From quotation</span>
                     <span x-show="syncError" x-cloak class="text-xs text-red-600" x-text="syncError"></span>
                     <span x-show="!syncError" class="size-2 rounded-full" :class="live ? 'bg-brand-500' : 'bg-amber-400'" :title="live ? 'Live' : 'Live Billing by polling'"></span>
                 </span>
@@ -234,9 +246,22 @@
             <div class="flex flex-wrap items-center gap-2">
                 <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Payment</span>
                 <template x-for="method in Object.keys(config.methods)" :key="method">
-                    <button type="button" @click="cart.payment_method = method; changed(); method === 'cash' && openTender()" :class="cart.payment_method === method ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'" class="rounded-md px-3 py-1.5 text-sm font-medium" x-text="config.methods[method]"></button>
+                    <button type="button" @click="setMethod(method)" :class="cart.payment_method === method ? 'bg-brand-600 text-white' : (method === 'credit' && !cart.customer_id ? 'bg-gray-50 text-gray-400' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')" class="rounded-md px-3 py-1.5 text-sm font-medium" x-text="config.methods[method]" :title="method === 'credit' && !cart.customer_id ? 'Choose the customer first (F4)' : ''"></button>
                 </template>
-                <span x-show="!isCash" x-cloak class="text-xs text-amber-700">Confirm the reference at the cashier.</span>
+                <span x-show="!isCash && !isCredit" x-cloak class="text-xs text-amber-700">Confirm the reference at the cashier.</span>
+            </div>
+
+            <div x-show="isCredit" x-cloak class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md bg-violet-50 px-4 py-3 text-violet-900 ring-1 ring-violet-200">
+                <div class="text-sm">
+                    <p class="font-semibold">Credit sale · ණයට</p>
+                    <p x-show="customer" x-text="customer ? customer.name + ' · ' + (customer.phone ?? '') : ''"></p>
+                    <p class="text-xs">The invoice prints marked CREDIT. The cashier checks the credit limit.</p>
+                </div>
+                <dl x-show="customer && customer.credit_limit !== undefined" class="grid grid-cols-2 gap-x-3 text-sm">
+                    <dt>Owes now</dt><dd class="text-right tabular" x-text="money(customer?.balance)"></dd>
+                    <dt>Available</dt><dd class="text-right font-semibold tabular" :class="Number(customer?.available_credit) < total ? 'text-red-700' : ''" x-text="money(customer?.available_credit)"></dd>
+                </dl>
+                <p x-show="customer && Number(customer.available_credit) < total" class="w-full text-xs font-semibold text-red-700">This bill is over the customer's credit limit. Only the owner can allow it at the cashier.</p>
             </div>
 
             <div x-show="isCash" class="mt-3 grid gap-3 sm:grid-cols-3">
@@ -259,6 +284,7 @@
             <div class="mt-3 flex items-center justify-between gap-2">
                 <div class="flex min-w-0 flex-wrap gap-2">
                     <x-ui.button variant="secondary" @click="hold()">Hold / Recall (F8)</x-ui.button>
+                    <x-ui.button variant="secondary" @click="quote()" x-bind:disabled="quoting"><span x-text="cart.lines.length ? 'Quotation (F7)' : 'Quotations (F7)'"></span></x-ui.button>
                     <x-ui.button variant="secondary" @click="openInvoices()">Last invoices</x-ui.button>
                     <x-ui.button variant="secondary" @click="reprintLast()" x-show="config.can_reprint">Reprint last (F10)</x-ui.button>
                     <x-ui.button variant="ghost" @click="clearCart()">Clear (Esc)</x-ui.button>
@@ -296,6 +322,97 @@
                 <li x-show="invoices.length === 0" class="px-4 py-8 text-center text-sm text-gray-500">No invoices yet today.</li>
             </ul>
         </aside>
+    </div>
+
+    {{-- ============================== Customer (F4) ============================== --}}
+    <div x-show="showCustomer" x-cloak class="fixed inset-0 z-40 flex items-start justify-center bg-gray-900/40 p-4" @click.self="showCustomer = false">
+        <div class="mt-12 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl" x-trap.inert="showCustomer">
+            <header class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                <h2 class="font-semibold">Customer</h2>
+                <button type="button" @click="showCustomer = false" class="text-2xl leading-none text-gray-500" aria-label="Close">&times;</button>
+            </header>
+
+            <div class="border-b border-gray-200 p-3" x-show="!quickAdd">
+                <label for="customer-search" class="sr-only">Find a customer</label>
+                <input id="customer-search" x-ref="customerSearch" x-model="customerQuery" @input.debounce.250ms="searchCustomers()" @keydown.enter.prevent="customerResults.length === 1 && selectCustomer(customerResults[0])" type="search" autocomplete="off" placeholder="Phone, name, NIC or village" class="block w-full rounded-md border-gray-300 text-lg">
+            </div>
+
+            <ul class="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto" x-show="!quickAdd">
+                <template x-for="row in customerResults" :key="row.id">
+                    <li @click="selectCustomer(row)" class="flex cursor-pointer items-center justify-between gap-3 px-4 py-2 text-sm hover:bg-brand-50">
+                        <div class="min-w-0">
+                            <p class="font-medium"><span x-text="row.name"></span> <span class="font-sinhala text-gray-500" x-text="row.name_si ?? ''"></span></p>
+                            <p class="text-xs text-gray-500" x-text="[row.code, row.phone, row.area, row.nic].filter(Boolean).join(' · ')"></p>
+                        </div>
+                        <div class="shrink-0 text-right text-xs">
+                            <p x-show="Number(row.balance) !== 0" class="tabular" x-text="'Owes ' + money(row.balance)"></p>
+                            <p x-show="Number(row.credit_limit) > 0" class="text-gray-500 tabular" x-text="'Credit left ' + money(row.available_credit)"></p>
+                            <p x-show="Number(row.overdue) > 0" class="font-semibold text-red-700 tabular" x-text="'Overdue ' + money(row.overdue)"></p>
+                        </div>
+                    </li>
+                </template>
+                <li x-show="customerResults.length === 0 && !customerSearching" class="px-4 py-6 text-center text-sm text-gray-500">No customer found.</li>
+            </ul>
+
+            <form x-show="quickAdd" x-cloak @submit.prevent="saveQuickAdd()" class="space-y-3 p-4">
+                <p class="text-sm text-gray-600">New customer. Credit needs a limit set by the manager.</p>
+                <div>
+                    <label for="quick-add-name" class="text-sm font-medium text-gray-700">Name</label>
+                    <input id="quick-add-name" :value="quickAdd?.name" @input="quickAdd.name = $event.target.value" required maxlength="150" class="mt-1 block w-full rounded-md border-gray-300">
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <label for="quick-add-phone" class="text-sm font-medium text-gray-700">Phone</label>
+                        <input id="quick-add-phone" :value="quickAdd?.phone" @input="quickAdd.phone = $event.target.value" required inputmode="tel" maxlength="15" class="mt-1 block w-full rounded-md border-gray-300">
+                    </div>
+                    <div>
+                        <label for="quick-add-area" class="text-sm font-medium text-gray-700">Village</label>
+                        <input id="quick-add-area" :value="quickAdd?.area" @input="quickAdd.area = $event.target.value" maxlength="100" class="mt-1 block w-full rounded-md border-gray-300">
+                    </div>
+                </div>
+                <p x-show="quickAdd?.error" class="text-sm text-red-700" x-text="quickAdd?.error"></p>
+                <div class="flex justify-end gap-2">
+                    <x-ui.button variant="secondary" @click="quickAdd = null">Back</x-ui.button>
+                    <x-ui.button type="submit" x-bind:disabled="quickAdd?.saving">Add and select</x-ui.button>
+                </div>
+            </form>
+
+            <footer class="flex items-center justify-between gap-2 border-t border-gray-200 px-4 py-3" x-show="!quickAdd">
+                <x-ui.button variant="ghost" @click="clearCustomer(); showCustomer = false" x-show="cart.customer_id">No customer (walk-in)</x-ui.button>
+                <span></span>
+                <x-ui.button variant="secondary" @click="startQuickAdd()" x-show="config.can_add_customer">New customer</x-ui.button>
+            </footer>
+        </div>
+    </div>
+
+    {{-- ============================== Quotations (F7) ============================== --}}
+    <div x-show="showQuotations" x-cloak class="fixed inset-0 z-40 flex items-start justify-center bg-gray-900/40 p-4" @click.self="showQuotations = false">
+        <div class="mt-12 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl" x-trap.inert="showQuotations">
+            <header class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                <h2 class="font-semibold">Open quotations</h2>
+                <button type="button" @click="showQuotations = false" class="text-2xl leading-none text-gray-500" aria-label="Close">&times;</button>
+            </header>
+            <div class="border-b border-gray-200 p-3">
+                <label for="quotation-search" class="sr-only">Find a quotation</label>
+                <input id="quotation-search" x-ref="quotationSearch" x-model="quotationQuery" @input.debounce.250ms="searchQuotations()" type="search" autocomplete="off" placeholder="Number, customer name or phone" class="block w-full rounded-md border-gray-300">
+            </div>
+            <ul class="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto">
+                <template x-for="row in quotations" :key="row.id">
+                    <li class="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                        <div>
+                            <p class="font-medium" x-text="row.number + (row.customer ? ' · ' + row.customer : '')"></p>
+                            <p class="text-xs text-gray-500" x-text="new Date(row.created_at).toLocaleDateString() + ' · ' + row.staff + ' · ' + row.lines + ' lines · valid until ' + row.valid_until"></p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold tabular" x-text="money(row.total)"></span>
+                            <x-ui.button size="sm" variant="secondary" @click="reprintQuotation(row)">Reprint</x-ui.button>
+                            <x-ui.button size="sm" @click="loadQuotation(row)">Load</x-ui.button>
+                        </div>
+                    </li>
+                </template>
+                <li x-show="quotations.length === 0" class="px-4 py-8 text-center text-sm text-gray-500">No open quotations.</li>
+            </ul>
+        </div>
     </div>
 
     {{-- ============================== Held bills ============================== --}}

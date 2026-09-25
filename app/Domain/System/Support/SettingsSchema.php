@@ -69,6 +69,15 @@ class SettingsSchema
                     'expiry_alert_days' => ['label' => 'Warn about batches expiring within (days)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:1', 'max:365']],
                 ],
             ],
+            'customers' => [
+                'title' => 'Customers & credit',
+                'description' => 'Credit terms, quotations and the overdue alert.',
+                'fields' => [
+                    'default_credit_days' => ['label' => 'Credit days for new customers', 'type' => 'number', 'rules' => ['required', 'integer', 'min:0', 'max:365'], 'hint' => 'Days after the sale before a credit invoice is overdue. Can be changed per customer.'],
+                    'quotation_valid_days' => ['label' => 'Quotations are valid for (days)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:1', 'max:90']],
+                    'overdue_alert' => ['label' => 'Tell the owner every morning about overdue credit', 'type' => 'checkbox', 'rules' => ['boolean']],
+                ],
+            ],
         ];
     }
 }

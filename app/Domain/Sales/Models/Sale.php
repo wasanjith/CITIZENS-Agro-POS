@@ -4,6 +4,8 @@ namespace App\Domain\Sales\Models;
 
 use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\Catalog\Models\PriceList;
+use App\Domain\Customers\Models\Customer;
+use App\Domain\Customers\Models\CustomerPaymentAllocation;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Inventory\Support\StockReference;
 use App\Domain\Sales\Enums\PaymentMethod;
@@ -28,6 +30,8 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string|null $invoice_no
  * @property SaleStatus $status
  * @property int|null $customer_id
+ * @property int|null $quotation_id
+ * @property Carbon|null $due_date
  * @property int $price_list_id
  * @property string $cart_uuid
  * @property int $invoiced_by
@@ -57,7 +61,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property Carbon $created_at
  */
 #[Fillable([
-    'invoice_no', 'status', 'customer_id', 'price_list_id', 'cart_uuid',
+    'invoice_no', 'status', 'customer_id', 'quotation_id', 'price_list_id', 'cart_uuid',
     'invoiced_by', 'invoiced_terminal_id', 'invoiced_at',
     'subtotal', 'line_discount_total', 'bill_discount', 'tax_total', 'total',
     'payment_method_intent', 'tendered_amount', 'change_due', 'balance_due', 'note',
@@ -81,6 +85,8 @@ class Sale extends Model implements StockReference
         return [
             'status' => SaleStatus::class,
             'customer_id' => 'integer',
+            'quotation_id' => 'integer',
+            'due_date' => 'date',
             'price_list_id' => 'integer',
             'invoiced_by' => 'integer',
             'invoiced_terminal_id' => 'integer',
@@ -135,6 +141,40 @@ class Sale extends Model implements StockReference
     public function priceList(): BelongsTo
     {
         return $this->belongsTo(PriceList::class);
+    }
+
+    /**
+     * @return BelongsTo<Customer, $this>
+     */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class)->withTrashed();
+    }
+
+    /**
+     * @return BelongsTo<Quotation, $this>
+     */
+    public function quotation(): BelongsTo
+    {
+        return $this->belongsTo(Quotation::class);
+    }
+
+    /**
+     * @return HasMany<SaleReturn, $this>
+     */
+    public function returns(): HasMany
+    {
+        return $this->hasMany(SaleReturn::class);
+    }
+
+    /**
+     * Customer payments applied to this credit invoice.
+     *
+     * @return HasMany<CustomerPaymentAllocation, $this>
+     */
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(CustomerPaymentAllocation::class);
     }
 
     /**
@@ -214,6 +254,27 @@ class Sale extends Model implements StockReference
     }
 
     /**
+     * Settled (possibly partly returned) with something still returnable.
+     */
+    public function canBeReturned(): bool
+    {
+        return in_array($this->status, [SaleStatus::Settled, SaleStatus::PartiallyReturned], true);
+    }
+
+    /**
+     * Settled on the customer's account (not paid at the time).
+     */
+    public function isCreditSale(): bool
+    {
+        return $this->payment_method_intent === PaymentMethod::Credit && $this->customer_id !== null && $this->settled_at !== null;
+    }
+
+    public function isOverdue(): bool
+    {
+        return $this->due_date !== null && $this->due_date->lt(today()) && (float) $this->balance_due > 0;
+    }
+
+    /**
      * Last digits people type at the cashier: "INV-2026-004512" → "4512".
      */
     public function shortNumber(): string
@@ -228,9 +289,11 @@ class Sale extends Model implements StockReference
      */
     public function liveSummary(): array
     {
-        $this->loadMissing(['invoicedBy', 'invoicedTerminal', 'settledBy']);
+        $this->loadMissing(['invoicedBy', 'invoicedTerminal', 'settledBy', 'customer']);
 
         return [
+            'customer_id' => $this->customer_id,
+            'customer' => $this->customer !== null ? ['id' => $this->customer->id, 'code' => $this->customer->code, 'name' => $this->customer->name, 'phone' => $this->customer->phone] : null,
             'id' => $this->id,
             'invoice_no' => $this->invoice_no,
             'short_no' => $this->shortNumber(),

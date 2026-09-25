@@ -15,6 +15,9 @@
             <x-ui.button variant="secondary" :href="route('pos.sales.invoice', $sale)" target="_blank">80 mm</x-ui.button>
             <x-ui.button variant="secondary" :href="route('pos.sales.invoice-pdf', $sale)">A4 PDF</x-ui.button>
         @endif
+        @if ($canReturnHere)
+            <x-ui.button variant="secondary" :href="route('pos.returns.create', ['sale' => $sale->id])">Return items</x-ui.button>
+        @endif
         @if ($canVoidHere)
             <x-ui.button variant="danger" x-data x-on:click="$dispatch('open-modal', 'void-sale')">Void</x-ui.button>
         @endif
@@ -77,6 +80,41 @@
                     <div class="flex justify-between text-gray-500"><dt>Printed</dt><dd>{{ $sale->print_count }}×</dd></div>
                 </dl>
             </x-ui.card>
+
+            @if ($sale->customer)
+                <x-ui.card title="Customer">
+                    <dl class="space-y-1 text-sm">
+                        <div class="flex justify-between"><dt>Customer</dt><dd><a href="{{ route('customers.show', $sale->customer) }}" class="text-brand-700 hover:underline">{{ $sale->customer->name }}</a> <span class="text-gray-500">{{ $sale->customer->code }}</span></dd></div>
+                        @if ($sale->isCreditSale())
+                            <div class="flex justify-between"><dt>Due date</dt><dd @class(['text-red-700 font-medium' => $sale->isOverdue()])>{{ $sale->due_date?->format('Y-m-d') }}</dd></div>
+                            <div class="flex justify-between"><dt>Still owed</dt><dd class="font-semibold tabular">{{ $money($sale->balance_due) }}</dd></div>
+                            <div class="flex flex-wrap justify-end gap-2 pt-1">
+                                <x-ui.button size="sm" variant="secondary" :href="route('pos.sales.credit-bill', $sale)" target="_blank">Credit bill</x-ui.button>
+                                @if ($canReprintCreditBill)
+                                    <form method="POST" action="{{ route('pos.sales.credit-bill.reprint', $sale) }}">
+                                        @csrf
+                                        <x-ui.button type="submit" size="sm" variant="secondary">Reprint credit bill</x-ui.button>
+                                    </form>
+                                @endif
+                            </div>
+                            @foreach ($sale->allocations as $allocation)
+                                <div class="flex justify-between text-gray-600"><dt><a href="{{ route('customers.payments.show', $allocation->payment) }}" class="hover:underline">{{ $allocation->payment->number }}</a> {{ $allocation->payment->date->format('Y-m-d') }}</dt><dd class="tabular">-{{ $money($allocation->amount) }}</dd></div>
+                            @endforeach
+                        @endif
+                    </dl>
+                </x-ui.card>
+            @endif
+
+            @if ($sale->returns->isNotEmpty())
+                <x-ui.card title="Returns">
+                    @foreach ($sale->returns as $return)
+                        <div class="flex justify-between py-1 text-sm">
+                            <span><a href="{{ route('sales.returns.show', $return) }}" class="font-mono text-brand-700 hover:underline">{{ $return->number }}</a> <span class="block text-xs text-gray-500">{{ $return->created_at->format('Y-m-d H:i') }} · {{ $return->refund_method->label() }}</span></span>
+                            <span class="tabular text-red-700">-{{ $money($return->total) }}</span>
+                        </div>
+                    @endforeach
+                </x-ui.card>
+            @endif
 
             <x-ui.card title="Payments">
                 @forelse ($sale->payments as $payment)

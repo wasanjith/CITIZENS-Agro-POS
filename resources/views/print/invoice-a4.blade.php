@@ -49,6 +49,12 @@
             <tr><td class="muted">{{ $t('date') }}</td><td>{{ $invoice['date']->format('Y-m-d H:i') }}</td></tr>
             <tr><td class="muted">{{ $t('counter') }}</td><td>{{ $invoice['counter'] }}</td></tr>
             <tr><td class="muted">{{ $t('staff') }}</td><td>{{ $invoice['staff'] }}</td></tr>
+            @if (! empty($invoice['customer']))
+                <tr><td class="muted">{{ $t('customer') }}</td><td>{{ $invoice['customer']['name'] }} ({{ $invoice['customer']['code'] }})</td></tr>
+            @endif
+            @if (! empty($invoice['is_credit']))
+                <tr><td class="muted">{{ $t('credit') }}</td><td>{{ ! empty($invoice['due_date']) ? $t('due_date').' '.$invoice['due_date']->format('Y-m-d') : '' }}</td></tr>
+            @endif
         </table>
     </div>
 

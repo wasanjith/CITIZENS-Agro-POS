@@ -143,6 +143,11 @@ return [
             'adjustment_approval_limit' => 10000,
             'expiry_alert_days' => 30,
         ],
+        'customers' => [
+            'default_credit_days' => 30,
+            'quotation_valid_days' => 7,
+            'overdue_alert' => true,
+        ],
     ],
 
 ];

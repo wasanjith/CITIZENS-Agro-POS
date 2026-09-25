@@ -119,6 +119,10 @@
 
         <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
             <x-ui.flash class="mb-6" />
+            @if (session('print_url'))
+                {{-- A receipt to print on this PC's printer (the page prints itself, Chrome --kiosk-printing). --}}
+                <iframe src="{{ session('print_url') }}" title="Printing" aria-hidden="true" class="pointer-events-none fixed bottom-0 right-0 size-px border-0 opacity-0"></iframe>
+            @endif
             @yield('content')
         </main>
     </div>

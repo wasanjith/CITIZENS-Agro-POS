@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Identity\Models\Terminal;
+use App\Domain\Identity\Support\CurrentTerminal;
 use App\Domain\Sales\Enums\SaleStatus;
 use App\Domain\Sales\Models\CounterEvent;
 use App\Domain\Sales\Models\Sale;
@@ -53,13 +54,16 @@ class SaleController extends Controller
     {
         $this->authorize('view', $sale);
 
-        $sale->load(['items.batches.batch', 'items.unit', 'payments.confirmedBy', 'invoicedBy', 'invoicedTerminal', 'settledBy', 'voidedBy', 'priceList']);
+        $sale->load(['items.batches.batch', 'items.unit', 'payments.confirmedBy', 'invoicedBy', 'invoicedTerminal', 'settledBy', 'voidedBy', 'priceList', 'customer', 'returns', 'allocations.payment']);
+        $atMain = app(CurrentTerminal::class)->get()?->isMainCashier() ?? false;
 
         return view('sales.show', [
             'sale' => $sale,
             'showCost' => $request->user()->can('viewCost', Product::class),
             'events' => CounterEvent::query()->with('user')->where('sale_id', $sale->id)->orWhere(fn ($query) => $query->where('cart_uuid', $sale->cart_uuid)->whereNotNull('cart_uuid'))->oldest('id')->limit(100)->get(),
             'canVoidHere' => $request->user()->can('void', $sale) && in_array($sale->status, [SaleStatus::Invoiced, SaleStatus::Settled], true),
+            'canReprintCreditBill' => $atMain && $sale->isCreditSale() && $request->user()->can('pos.settle'),
+            'canReturnHere' => $atMain && $sale->canBeReturned() && $request->user()->can('return', $sale),
         ]);
     }
 }

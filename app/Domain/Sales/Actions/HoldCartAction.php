@@ -43,6 +43,7 @@ class HoldCartAction
         [$sale, $event] = DB::transaction(function () use ($terminal, $user, $priced, $note): array {
             $sale = Sale::create([
                 'status' => SaleStatus::OnHold,
+                'customer_id' => $priced['customer_id'],
                 'price_list_id' => $priced['price_list_id'],
                 'cart_uuid' => $priced['cart_uuid'] ?: (string) str()->uuid(),
                 'invoiced_by' => $user->id,
@@ -113,6 +114,7 @@ class HoldCartAction
             $cart = [
                 'cart_uuid' => $sale->cart_uuid,
                 'price_list_id' => $sale->price_list_id,
+                'customer_id' => $sale->customer_id,
                 'payment_method' => $sale->payment_method_intent->value,
                 'bill_discount' => $sale->bill_discount,
                 'tendered' => null,

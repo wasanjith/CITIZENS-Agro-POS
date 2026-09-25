@@ -9,12 +9,12 @@
 
 | Item | Status |
 |---|---|
-| **Current phase** | Phase 2: Inventory + Purchasing (built; waiting for opening stock count + a real PO/GRN run) |
+| **Current phase** | Phase 4: Customers, Credit, Returns, Quotations (built; waiting for the real customer list and a credit / return run in the shop) |
 | **Last updated** | 2026-09-25 |
-| **Tests** | 209 Pest tests: 200 passing, 9 skipped (Meilisearch tests; Docker was not running). New `Concurrency` suite races two MySQL connections. |
+| **Tests** | 310 Pest tests, all passing (Meilisearch was running, so none skipped). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
-| **Next** | Owner imports the real product list (opening stock now goes straight into stock) and checks stock against the count sheet → one real PO → approve → receive in two deliveries (Phase 2 acceptance) → printing test on the first printer → Phase 3 (POS) |
+| **Next** | Owner: try a credit sale with one of the 8 dummy customers (credit bill → sign → seal), a customer payment and a return; later replace the dummy customers with the real credit list → the Phase 2/3 checks still pending (product import, real PO/GRN, printers) → Phase 5 (Finance) |
 
 ### Phase progress
 
@@ -23,8 +23,8 @@
 | 0 | Foundation + printing spike | 🟡 Built · real-printer test pending |
 | 1 | Catalog + Search | 🟡 Built · real product import + 30-phrase search check pending |
 | 2 | Inventory + Purchasing | 🟡 Built · opening stock check + real PO/GRN run pending |
-| 3 | POS core: counter invoices, settlement, Live Billing, handover | ⚪ Not started |
-| 4 | Customers, Credit, Returns, Quotations | ⚪ Not started |
+| 3 | POS core: counter invoices, settlement, Live Billing, handover | 🟡 Built · real printers, drawer and Reverb test pending |
+| 4 | Customers, Credit, Returns, Quotations | 🟡 Built · real customer list + in-shop credit/return run pending |
 | 5 | Finance & Banking | ⚪ Not started |
 | 6 | HR, Attendance, Payroll | ⚪ Not started |
 | 7 | Reports, Dashboard, Go-live | ⚪ Not started |
@@ -34,8 +34,10 @@
 1. **VAT:** is the shop VAT-registered? Any tax-exempt products? (A "VAT 18%" rate is seeded **inactive**; products have no tax until this is answered.)
 2. **Product list:** please fill the import template (Products → Import from Excel → Download template) or send the old system's export.
 3. **Short code ranges:** OK with Fertilizers 1000–1999, Seeds 2000–2999, Agro-chemicals 3000–3999, Tools 4000–4999, Bicycle Parts 5000–6999, Other 9000–9999? (Editable on the Categories page.)
-3. **Payroll:** calculate EPF/ETF, or simple basic + allowances − deductions? (needed for Phase 6)
-4. **Printer model:** which 80 mm printer will be bought? Buy one first and run the printing test.
+4. **Payroll:** calculate EPF/ETF, or simple basic + allowances − deductions? (needed for Phase 6)
+5. **Printer model:** which 80 mm printer will be bought? Buy one first and run the printing test.
+6. **Real credit customers:** dummy customers are used for now (owner's choice, 2026-09-25). Before go-live, send the real list (name, phone, what each owes, limit, credit days).
+7. **Counter staff and customers:** the reply "can counter staff" looked cut off. For now counter staff can add customers (no credit) but not set credit limits. Please confirm, or say if staff should also set limits.
 
 ---
 
@@ -66,12 +68,41 @@
 | 2026-09-25 | Receiving more than is still outstanding on a PO line is refused; extra goods go in as free quantity or a separate line. Posted GRNs are never edited; mistakes are fixed with a supplier return. |
 | 2026-09-25 | Stock adjustments and stocktake differences above **Rs. 10,000** (Settings → Inventory) need the Super Admin. |
 | 2026-09-25 | Journal postings for GRNs and adjustments are left for Phase 5 (Finance), when the chart of accounts exists. Supplier payments also come with Phase 5. |
+| 2026-09-25 | **Credit:** a credit sale needs a customer. It hits the customer's account when the cashier settles it (not when it prints), due after the customer's credit days. Going over the credit limit needs the Super Admin's tick at settlement; a delegated Manager can never allow it. |
+| 2026-09-25 | Counter staff may quick-add a customer (name, phone, village) with no credit; only the Owner/Manager set credit limits. Phone numbers are unique. |
+| 2026-09-25 | Customer payments are taken at the main cashier (drawer holder); cash counts in the drawer. Oldest invoice first unless the cashier chooses; any extra stays as an advance. |
+| 2026-09-25 | **Returns** only at the main cashier (`pos.refund`), always against the original invoice. Refund = the line's share after the bill discount; cash from the drawer, or credit to the customer's account (forced while a credit invoice is unpaid). Stock goes back to the batches it was sold from; damaged goods are written off as DAMAGE. A returned invoice can no longer be voided. |
+| 2026-09-25 | **Quotations** reserve no stock and are billed at today's prices when loaded (F7); valid 7 days (Settings → Customers). Owner confirmed today's prices. |
+| 2026-09-25 | **Credit bill:** when the cashier settles a credit sale, a "ණය බිල්පත / Credit bill" (shop copy) prints on the main printer with the customer's details, items, total, due date and account balance, and space for the customer's signature, the owner's signature and the shop seal. The shop keeps it. Reprints are marked COPY. |
+| 2026-09-25 | Returns: cash or credit to account, confirmed by the owner. |
+| 2026-09-25 | **No SMS** reminders (owner). Overdue credit is only a morning bell notification to the Owner/Manager; the SMS code and setting were removed. Dummy customers for development. |
 
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-09-25: Owner's answers on Phase 4: credit bill, dummy customers, no SMS
+- **Credit bill:** settling a credit sale at the main cashier now also prints a credit bill (`print/credit-bill.blade.php`) on the main printer: customer name (Sinhala), code, phone, NIC, address, items, total, due date, credit days, total owed on the account, the promise to pay, and lines for the customer's signature and the owner's signature plus a box for the shop seal. The cashier screen says "get the customer's signature and stamp the shop seal". A retried settlement does not print it twice. Invoice page: "Credit bill" (view) and "Reprint credit bill" (COPY, main terminal).
+- **Dummy customers:** `DevelopmentCustomerSeeder` (8 customers, Sinhala names, villages, limits, credit days, 5 opening balances, 1 inactive). Runs with `migrate:fresh --seed` locally; added to this PC's `citizensDB` now. Safe to run again.
+- **No SMS:** removed the SMS gateway, its setting and the SMS part of the reminder job; the morning bell notification stays (can be switched off in Settings → Customers & credit).
+- Quotation prices and the return rules stay as built (owner confirmed).
+- **Tests:** 310, all passing (new: credit bill printed once, content, reprint as COPY, none for cash sales; seeder; reminder without SMS). Larastan 0 errors, Pint clean. `npm run build` done.
+
+### 2026-09-25: Phase 4 built (Customers, Credit, Returns, Quotations)
+- **Tables:** customers, customer_ledger, customer_payments (+ allocations), sale_returns (+ lines, + line batches), quotations (+ lines); sales got a customer link, `due_date` and `quotation_id`. New numbers: `C-00001` (customers), `RCP-`, `RET-`, `QT-`.
+- **Customers** (menu → Customers): list with filters (village, owes money, overdue), add/edit with price list, credit limit, credit days and an opening balance from the old books, profile with balance, unpaid invoices, ageing, payments and the account, **statement PDF** (Sinhala/English), and a **credit ageing** report for everyone.
+- **Counter screen:** **F4** finds a customer by phone, name, NIC or village (shows what they owe, credit left, overdue) or quick-adds one (name, phone, village; no credit). The customer's price list is applied. **Credit** payment needs a customer; the invoice prints marked "ණය ඉන්වොයිසිය / CREDIT INVOICE" with the customer. **F7** prints a quotation from the bill; F7 on an empty bill lists open quotations to load and bill.
+- **Cashier:** the settle card shows the customer's balance and limit. Over the limit only the owner can allow it (tick box); a delegated Manager cannot. New buttons: **Customer payment** (oldest invoice first or chosen amounts; extra stays as an advance; Sinhala receipt on the main printer) and **Return** (find the invoice, quantities per line, restock or damaged, cash from the drawer or credit to the account; Sinhala return receipt). Invoice pages have a "Return items" button at the main terminal.
+- **Drawer and Z report:** cash customer payments count in the expected cash; cash refunds are shown separately; the Z report lists customer payments and returns.
+- **Voids:** voiding a settled credit sale takes it off the customer's account; a sale with payments applied or returns can no longer be voided (use a return).
+- **Reminders:** every morning at 07:05 the Owner/Manager get a bell notification about overdue credit. SMS reminders (days 1, 7, 14, 30 overdue) can be switched on in Settings → Customers & credit, but only write to the log until an SMS provider is chosen.
+- **Tests:** 53 new (307 total): credit limit and override, ledger balance = debits − credits = unpaid invoices, FIFO and manual payment allocation, advances, drawer cash, returns never above sold − returned, stock back to the original batch, damage write-off, bill-discount shares adding up to the invoice total, quotations (convert, expiry, idempotency), overdue reminders, and Sinhala receipts.
+- **Checked in headless Chrome** (throwaway database `citizensDB_browser`, served with `php -S` on port 8123): F4 search and select, credit invoice, credit blocked without a customer, F7 quotation → load → bill, quick-add, cashier credit settlement with the balance shown, and the new pages. No JavaScript errors. This found and fixed a bug: the counter's `customer` data and the `customer()` (F4) function had the same name, so the F4 key stopped working after a customer was chosen (renamed to `openCustomer()`). The dev database was not touched by the check.
+- **Also fixed:** this status table still said Phase 2; it now shows Phases 3 and 4 as built.
+- **Set up on another PC:** `php artisan migrate`, `php artisan db:seed --class=DocumentSequenceSeeder`, `npm run build`. The scheduler must run for the 07:05 overdue reminder. (Done on this PC's `citizensDB`.)
+- **Not checked:** real printers for the new receipts, SMS sending (no provider yet).
 
 ### 2026-09-25: Phase 3 built (POS: counter invoices, settlement, Live Billing, handover)
 - **Tables:** drawer_sessions (one open per terminal, database constraint), cash_movements, sales, sale_items, sale_item_batches, payments, approval_requests, counter_events, print_jobs; delegations got `expiry_processed_at`.

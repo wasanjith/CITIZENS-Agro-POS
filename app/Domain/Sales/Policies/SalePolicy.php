@@ -44,4 +44,12 @@ class SalePolicy
     {
         return $user->can('pos.void');
     }
+
+    /**
+     * Take goods back against this invoice (at the main cashier).
+     */
+    public function return(User $user, Sale $sale): bool
+    {
+        return $user->can('pos.refund') && $sale->canBeReturned();
+    }
 }

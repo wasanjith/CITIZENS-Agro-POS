@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pos;
 
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\PriceList;
+use App\Domain\Customers\Models\Customer;
 use App\Domain\Identity\Support\CurrentTerminal;
 use App\Domain\Sales\Enums\PaymentMethod;
 use App\Domain\Sales\Services\DiscountLimits;
@@ -34,6 +35,7 @@ class CounterController extends Controller
                 'max_discount_percent' => $max !== null ? (string) $max : null,
                 'categories' => Category::query()->whereNull('parent_id')->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'name_si'])->all(),
                 'can_reprint' => $user->can('pos.reprint'),
+                'can_add_customer' => $user->can('quickAdd', Customer::class),
                 'can_settle' => $terminal->isMainCashier() && $user->can('pos.settle'),
                 'urls' => [
                     'search' => route('api.pos.search'),
@@ -46,6 +48,11 @@ class CounterController extends Controller
                     'holds' => route('api.pos.holds.index'),
                     'hold' => route('api.pos.holds.store'),
                     'approvals' => route('api.pos.approvals.store'),
+                    'customers' => route('api.pos.customers.index'),
+                    'customer' => url('/api/pos/customers/__ID__'),
+                    'quotations' => route('api.pos.quotations.index'),
+                    'quotation_cart' => url('/api/pos/quotations/__ID__/cart'),
+                    'quotation_reprint' => url('/api/pos/quotations/__ID__/reprint'),
                     'cashier' => $terminal->isMainCashier() ? route('pos.cashier') : null,
                 ],
                 'invoice_language' => $settings->get('receipt.language'),

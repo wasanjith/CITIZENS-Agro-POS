@@ -11,6 +11,13 @@
             ['label' => 'Cashier authority', 'route' => 'admin.delegations.index', 'active' => 'admin.delegations.*', 'can' => 'drawer.handover'],
             ['label' => 'Drawer sessions', 'route' => 'admin.drawer-sessions.index', 'active' => 'admin.drawer-sessions.*', 'can' => ['drawer.handover', 'drawer.manage', 'reports.sales']],
         ],
+        'Customers' => [
+            ['label' => 'Customers', 'route' => 'customers.index', 'active' => ['customers.index', 'customers.create', 'customers.show', 'customers.edit'], 'can' => 'customers.view'],
+            ['label' => 'Credit ageing', 'route' => 'customers.ageing', 'active' => 'customers.ageing', 'can' => 'customers.view'],
+            ['label' => 'Customer payments', 'route' => 'customers.payments.index', 'active' => 'customers.payments.*', 'can' => 'customers.view'],
+            ['label' => 'Returns', 'route' => 'sales.returns.index', 'active' => 'sales.returns.*', 'can' => ['pos.refund', 'pos.settle', 'reports.sales']],
+            ['label' => 'Quotations', 'route' => 'quotations.index', 'active' => 'quotations.*', 'can' => ['pos.sell', 'customers.view']],
+        ],
         'Catalog' => [
             ['label' => 'Products', 'route' => 'catalog.products.index', 'active' => 'catalog.products.*', 'can' => 'catalog.view'],
             ['label' => 'Categories', 'route' => 'catalog.categories.index', 'active' => 'catalog.categories.*', 'can' => 'catalog.manage'],
@@ -54,7 +61,7 @@
                 <p class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-200/80">{{ $heading }}</p>
                 <ul class="mt-2 space-y-1">
                     @foreach ($visible as $item)
-                        @php $isActive = request()->routeIs($item['active']); @endphp
+                        @php $isActive = request()->routeIs(...(array) $item['active']); @endphp
                         <li>
                             <a
                                 href="{{ route($item['route'], $item['params'] ?? []) }}"

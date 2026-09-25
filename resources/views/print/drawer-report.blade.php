@@ -34,6 +34,12 @@
         <div class="row muted"><span>{{ $session['opened_at']->format('H:i') }} – {{ $session['closed_at']?->format('H:i') ?? '…' }}</span><span>{{ $session['close_reason'] }}</span></div>
         <div class="row"><span>{{ $t('opening_float') }}</span><span class="num">{{ $money($session['summary']['opening_float']) }}</span></div>
         <div class="row"><span>{{ $t('cash_sales') }}</span><span class="num">{{ $money($session['summary']['cash_sales']) }}</span></div>
+        @if ((float) $session['summary']['cash_refunds'] > 0)
+            <div class="row"><span>{{ $t('cash_refunds') }}</span><span class="num">-{{ $money($session['summary']['cash_refunds']) }}</span></div>
+        @endif
+        @if ((float) $session['summary']['customer_cash'] > 0)
+            <div class="row"><span>{{ $t('customer_payments') }}</span><span class="num">{{ $money($session['summary']['customer_cash']) }}</span></div>
+        @endif
         @foreach ($session['summary']['movements'] as $type => $movement)
             @if ((float) $movement['amount'] > 0)
                 <div class="row"><span>{{ $t($type) }}</span><span class="num">{{ $movement['sign'] > 0 ? '' : '-' }}{{ $money($movement['amount']) }}</span></div>
@@ -65,6 +71,22 @@
     @empty
         <div class="muted">—</div>
     @endforelse
+
+    @if ($report['customer_payments'] !== [])
+        <hr class="rule">
+        <div class="item-name">{{ $t('customer_payments') }}</div>
+        @foreach ($report['customer_payments'] as $method => $row)
+            <div class="row"><span>{{ $t('method_'.$method) }} ({{ $row['count'] }})</span><span class="num">{{ $money($row['amount']) }}</span></div>
+        @endforeach
+    @endif
+
+    @if ($report['returns'] !== [])
+        <hr class="rule">
+        <div class="item-name">{{ $t('returns') }}</div>
+        @foreach ($report['returns'] as $method => $row)
+            <div class="row"><span>{{ $t('refund_'.$method) }} ({{ $row['count'] }})</span><span class="num">-{{ $money($row['total']) }}</span></div>
+        @endforeach
+    @endif
 
     <hr class="rule">
     <div class="item-name">{{ $t('voids') }}: {{ $report['void_count'] }}</div>
