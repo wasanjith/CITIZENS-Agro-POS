@@ -26,6 +26,8 @@ use App\Domain\Purchasing\Models\PurchaseOrder;
 use App\Domain\Purchasing\Models\Supplier;
 use App\Domain\Purchasing\Models\SupplierPayment;
 use App\Domain\Purchasing\Models\SupplierReturn;
+use App\Domain\Reports\ReportRegistry;
+use App\Domain\Reports\Services\ReportLookups;
 use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Models\SaleReturn;
 use App\Domain\System\Services\Settings;
@@ -46,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(CurrentTerminal::class);
         $this->app->scoped(DelegationService::class);
         $this->app->singleton(Settings::class);
+        $this->app->scoped(ReportRegistry::class);
+        $this->app->scoped(ReportLookups::class);
     }
 
     /**

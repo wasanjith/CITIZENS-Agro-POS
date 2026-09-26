@@ -9,12 +9,12 @@
 
 | Item | Status |
 |---|---|
-| **Current phase** | Phase 6: HR, Attendance, Payroll (built; waiting for the staff list, shop hours, holidays and the owner's payroll answers) |
+| **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
 | **Last updated** | 2026-09-26 |
-| **Tests** | 431 Pest tests, all passing (Meilisearch was running, so none skipped). |
+| **Tests** | 449 Pest tests, all passing (Meilisearch was running, so none skipped). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
-| **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Earlier checks still pending (bank accounts, product import, real PO/GRN, printers, real customer list) → Phase 7 (Reports, Dashboard, Go-live) |
+| **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
 
 ### Phase progress
 
@@ -27,7 +27,7 @@
 | 4 | Customers, Credit, Returns, Quotations | 🟡 Built · real customer list + in-shop credit/return run pending |
 | 5 | Finance & Banking | 🟡 Built · real bank accounts + opening balances pending |
 | 6 | HR, Attendance, Payroll | 🟡 Built · staff list, shop hours, holidays and payroll rules pending |
-| 7 | Reports, Dashboard, Go-live | ⚪ Not started |
+| 7 | Reports, Dashboard, Go-live | 🟡 Built · Sinhala quick guides, hardware install, training and parallel run pending |
 
 ### Open questions for the owner
 
@@ -89,12 +89,25 @@
 | 2026-09-25 | **Owner:** the counted cash goes home at closing and the next day starts with the cashier's morning float brought from it. The "safe" account is shown as **Cash at home (day's takings)**. |
 
 | 2026-09-26 | **Attendance:** the first PIN sign-in of the day on a shop terminal clocks the employee in; they clock out with the button in the top bar. Late = after the shift start + grace minutes; overtime = minutes after the shift end (from 30 minutes); on a day off or a holiday every minute is overtime. Only the Super Admin corrects attendance (with a reason, audited); the Manager can view it. |
+| 2026-09-26 | **Reports:** a sale counts on the day it was settled (like the books); a return counts on the day it was taken, against the original sale's counter, staff member and customer; a voided sale does not count. Item, category and brand figures share each bill discount across the lines. Reports over 12 months read the nightly summary. Profit reports are Super Admin only; the Manager sees sales and stock reports with cost. |
 | 2026-09-26 | **Payroll:** no-pay = no-pay days × basic ÷ working days; OT = hours × basic × 1.5 ÷ 240; EPF/ETF on basic − no-pay + allowances marked "EPF applies" (not on OT). Approving posts the salaries as owed (Dr Salaries, EPF/ETF expense; Cr Salaries payable, EPF/ETF payable, Staff advances); paying moves the money (drawer, cash at home or bank, one entry per person). An approved payroll can be reopened until someone is paid. Payroll, employees and advances are Super Admin only and can never be handed over. |
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-09-26: Phase 7 built (Reports, Dashboard, Go-live)
+- **Reports page** (menu → Reports): one generic report screen (filter bar with date range and quick periods → summary tiles → table with totals → Excel / PDF). 29 reports: *Sales* daily summary / Z report, by item, category, brand, counter, staff, customer, hour; discounts given; settlement waiting time. *Loss prevention* removed items & voids by counter, removed items & cleared bills (detail), reprints, discounts above limit. *Profit* by item, category, day (FIFO cost). *Inventory* stock on hand & valuation, stock by batch, movement history, expiry, dead stock, reorder list, adjustment & stocktake variance. *Purchasing* by supplier, by item, open orders, supplier ageing. *Customers* receivables ageing, credit sales. *Cash & finance* drawer sessions & variances, handover history, expenses. *Audit* price change history, user sign-ins. The existing P&L, trial balance, balance sheet, cash / bank book, cheque register, HR reports, activity and print logs are linked from the same page. Each report checks its own permission.
+- **Exports:** Excel with numbers kept as numbers and a totals row; A4 PDF (landscape for wide reports, Sinhala font embedded). Excel over 5,000 rows is built in the background and announced under the bell (file kept 7 days); PDF over 3,000 rows is refused with a pointer to Excel.
+- **Dashboard:** owner sees net sales today (+ per counter), invoices waiting (amber when the oldest waits 10+ min), expected cash in the drawer, cashier-authority holder with a **Revoke now** button, approvals waiting, stock alerts (with the lowest items), purchasing to do, cheques due, what customers owe / the shop owes, top 10 items (30 days) and a sales-by-hour chart. Manager: sales, stock and purchasing only; staff: shortcuts and stock alerts. Works at phone width (checked at 390 px).
+- **Performance:** new table `daily_sales_summaries` (per day and counter, rebuilt nightly at 02:50 for the last 40 days; `php artisan reports:rebuild-summaries --all` for everything) used by reports over 12 months; indexes for the report filters (void date, payment date, reprints, approvals, GRN status/date, customer payment date, stocktake posting, delegations, activity log).
+- **Go-live** (Administration → Go-live, owner only): readiness checklist (automatic checks for products, opening stock, customers, suppliers, banks, PINs, employee links, terminals, test prints, 2FA; the rest marked "confirm by hand"), and an Excel import of **credit customers and suppliers with their opening balances** (template → check → import, all or nothing; balances posted to the books like the forms).
+- **Tests:** 18 new (449 total): the Z report agrees with the P&L to the cent, item / counter / staff / profit figures add up, the nightly summary equals the live figures, returns land on their own day, loss-prevention counts, stock value, permissions (staff / manager / owner), Excel and PDF downloads, queued export stored per user, dashboard per role, customer and supplier import with the books checked. `phpunit.xml` now sets 512 MB memory for tests (the suite ran out at 128 MB once Excel files were written).
+- **Checked in headless Chrome** (throwaway `citizensDB_browser`, `php -S` on port 8123, 11 sales seeded): dashboard, reports page, Z report, sales by hour, stock valuation, go-live. No JavaScript errors. Fixed: dashboard cards stretched to the tallest card in their row, and the dashboard was 12 px too wide on a phone. The dev database was not touched. Sidebar version label now "v0.8 (Phase 7)".
+- **This PC's `citizensDB`:** migrated (report tables and indexes); no settled sales yet, so the summary rebuild had nothing to do.
+- **Set up on another PC:** `php artisan migrate`, `npm run build`, then `php artisan reports:rebuild-summaries --all`. The scheduler must run for the 02:50 rebuild.
+- **Not done (needs people, not code):** Sinhala 1-page quick guides per role, hardware installation, staff/owner training, parallel run.
 
 ### 2026-09-26: Collapsible sidebar
 - Sidebar topics are now collapsible groups, each with an icon and a chevron. Only the group holding the current page opens on load; the others open with a click.

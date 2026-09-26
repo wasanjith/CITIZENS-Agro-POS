@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\DelegationController;
 use App\Http\Controllers\Admin\DrawerSessionController;
+use App\Http\Controllers\Admin\GoLiveController;
 use App\Http\Controllers\Admin\LiveBillingController;
 use App\Http\Controllers\Admin\PrinterController;
 use App\Http\Controllers\Admin\PrintingTestController;
@@ -64,6 +65,7 @@ use App\Http\Controllers\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Purchasing\SupplierController;
 use App\Http\Controllers\Purchasing\SupplierPaymentController;
 use App\Http\Controllers\Purchasing\SupplierReturnController;
+use App\Http\Controllers\Reports\ReportController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\Sales\QuotationController;
 use App\Http\Controllers\Sales\SaleReturnController;
@@ -375,6 +377,16 @@ Route::middleware('auth')->group(function () {
         Route::get('reports/epf-etf', [HrReportController::class, 'epfEtf'])->name('reports.epf-etf');
     });
 
+    /*
+    | Phase 7: Reports. Each report checks its own permission (ReportRegistry).
+    */
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('downloads/{file}', [ReportController::class, 'download'])->name('downloads.show');
+        Route::get('{report}', [ReportController::class, 'show'])->where('report', '[a-z0-9-]+')->name('show');
+        Route::get('{report}/export.{format}', [ReportController::class, 'export'])->where(['report' => '[a-z0-9-]+', 'format' => 'xlsx|pdf'])->name('export');
+    });
+
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', UserController::class)->except(['show', 'destroy']);
 
@@ -398,6 +410,10 @@ Route::middleware('auth')->group(function () {
         Route::get('printing-test/pdf', [PrintingTestController::class, 'pdf'])->name('printing-test.pdf');
 
         Route::middleware('can:admin.settings.manage')->group(function () {
+            Route::get('go-live', [GoLiveController::class, 'index'])->name('go-live.index');
+            Route::get('go-live/{type}/template', [GoLiveController::class, 'template'])->whereIn('type', ['customers', 'suppliers'])->name('go-live.template');
+            Route::post('go-live/{type}/import', [GoLiveController::class, 'preview'])->whereIn('type', ['customers', 'suppliers'])->name('go-live.preview');
+            Route::post('go-live/{type}/import/{token}', [GoLiveController::class, 'store'])->whereIn('type', ['customers', 'suppliers'])->whereUuid('token')->name('go-live.store');
             Route::get('settings/{group}', [SettingsController::class, 'edit'])->name('settings.edit');
             Route::put('settings/{group}', [SettingsController::class, 'update'])->name('settings.update');
         });

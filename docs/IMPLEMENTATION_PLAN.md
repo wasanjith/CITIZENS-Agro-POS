@@ -696,9 +696,9 @@ payslip_lines:    id, payslip_id, component_name, type, amount
 ## Phase 7: Reports, Dashboard, Go-live
 
 ### Work items
-- [ ] **Owner dashboard** (desktop + phone layout): **Live Billing** panel / link (Phase 3.6), today's sales per counter, invoices waiting for settlement, cash in drawer, current cashier-authority holder (with revoke button), pending approvals, pending POs, low stock, expiring batches, cheques due, receivables/payables, top 10 items, sales by hour chart.
-- [ ] **Manager dashboard:** stock alerts, pending POs/GRNs, today's sales count.
-- [ ] Reports (each: filter bar → Blade table → Excel/PDF export; heavy ones via queued export):
+- [x] **Owner dashboard** (desktop + phone layout): **Live Billing** panel / link (Phase 3.6), today's sales per counter, invoices waiting for settlement, cash in drawer, current cashier-authority holder (with revoke button), pending approvals, pending POs, low stock, expiring batches, cheques due, receivables/payables, top 10 items, sales by hour chart. *(One dashboard; each panel shows only when the user holds its permission. Top 10 = last 30 days.)*
+- [x] **Manager dashboard:** stock alerts, pending POs/GRNs, today's sales count.
+- [x] Reports (each: filter bar → Blade table → Excel/PDF export; heavy ones via queued export): *(29 reports on one generic page (`/reports/{key}`) plus links to the finance, HR and audit pages that already existed. Excel over 5,000 rows is built by a queued job and announced under the bell; PDF is refused over 3,000 rows.)*
 
 | Group | Reports |
 |---|---|
@@ -712,8 +712,8 @@ payslip_lines:    id, payslip_id, component_name, type, amount
 | HR | Attendance summary, late/OT, leave, payroll summary, EPF/ETF |
 | Audit | Activity log, price change history, user logins, print log |
 
-- [ ] Performance: indexes for every report filter; reports over 12 months use summary table `daily_sales_summaries` rebuilt nightly.
-- [ ] Data migration: final product/stock/customer balances/supplier balances import.
+- [x] Performance: indexes for every report filter; reports over 12 months use summary table `daily_sales_summaries` rebuilt nightly. *(02:50, last 40 days; `php artisan reports:rebuild-summaries --all` for everything.)*
+- [x] Data migration: final product/stock/customer balances/supplier balances import. *(Administration → Go-live: customer and supplier Excel import with opening balances, plus a readiness checklist. Products and stock use the Phase 1 import.)*
 - [ ] Hardware installation & configuration (section 16), user training (Sinhala quick guides per role, 1 page each), owner training on handover and reports.
 - [ ] Parallel run, then go-live.
 
