@@ -40,6 +40,7 @@
                     <span class="hidden text-xs text-brand-100 md:inline" title="Cashier authority">Cashier: <span class="font-semibold text-white" data-cashier-holder>{{ $posHolder->name }}</span></span>
                 @endif
                 <span class="font-medium">{{ $posUser?->name }}</span>
+                @include('hr.partials.clock-button', ['style' => 'pos'])
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button type="submit" class="rounded bg-brand-800 px-2 py-1 text-xs hover:bg-brand-700">Sign out</button>
@@ -47,10 +48,13 @@
             </div>
         </header>
 
-        @if (session()->hasAny(['success', 'error', 'warning']) || $errors->has('drawer'))
+        @if (session()->hasAny(['success', 'error', 'warning']) || $errors->hasAny(['drawer', 'attendance']))
             <div class="shrink-0 px-3 pt-2 sm:px-4">
                 <x-ui.flash />
                 @error('drawer')
+                    <x-ui.alert type="error">{{ $message }}</x-ui.alert>
+                @enderror
+                @error('attendance')
                     <x-ui.alert type="error">{{ $message }}</x-ui.alert>
                 @enderror
             </div>

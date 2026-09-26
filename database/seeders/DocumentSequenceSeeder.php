@@ -24,6 +24,8 @@ class DocumentSequenceSeeder extends Seeder
             ['type' => 'JE', 'prefix' => 'JE-{Y}-', 'padding' => 6, 'reset_period' => SequenceResetPeriod::Yearly],
             ['type' => 'EXP', 'prefix' => 'EXP-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
             ['type' => 'SPAY', 'prefix' => 'SP-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
+            ['type' => 'EMP', 'prefix' => 'E-', 'padding' => 3, 'reset_period' => SequenceResetPeriod::Never],
+            ['type' => 'ADV', 'prefix' => 'ADV-{Y}-', 'padding' => 4, 'reset_period' => SequenceResetPeriod::Yearly],
         ];
 
         foreach ($sequences as $sequence) {

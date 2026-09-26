@@ -10,7 +10,23 @@
             userName: '',
             pin: '',
             maxLength: @js(config('pos.pin.max_length')),
-            select(id, name) { this.userId = id; this.userName = name; this.pin = ''; this.$nextTick(() => this.$refs.pin.focus()); },
+            camera: @js($clockInPhoto),
+            select(id, name) { this.userId = id; this.userName = name; this.pin = ''; this.startCamera(); this.$nextTick(() => this.$refs.pin.focus()); },
+            startCamera() {
+                if (! this.camera || this.$refs.video.srcObject || ! navigator.mediaDevices?.getUserMedia) return;
+                navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } })
+                    .then((stream) => { this.$refs.video.srcObject = stream; })
+                    .catch(() => { this.camera = false; });
+            },
+            snapshot() {
+                const video = this.$refs.video;
+                if (! this.camera || ! video?.srcObject || ! video.videoWidth) return;
+                const canvas = document.createElement('canvas');
+                canvas.width = 320;
+                canvas.height = Math.round(320 * video.videoHeight / video.videoWidth);
+                canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                this.$refs.photo.value = canvas.toDataURL('image/jpeg', 0.7);
+            },
             press(digit) { if (this.pin.length < this.maxLength) { this.pin += digit; } this.$refs.pin.focus(); },
             back() { this.pin = this.pin.slice(0, -1); this.$refs.pin.focus(); },
         }"
@@ -38,9 +54,14 @@
                 @endforeach
             </div>
 
-            <form method="POST" action="{{ route('pin-login.store') }}" class="mt-6" x-show="userId" x-cloak>
+            <form method="POST" action="{{ route('pin-login.store') }}" class="mt-6" x-show="userId" x-cloak @submit="snapshot()">
                 @csrf
                 <input type="hidden" name="user_id" :value="userId">
+                <input type="hidden" name="photo" x-ref="photo">
+                @if ($clockInPhoto)
+                    {{-- Clock-in photo (Settings → HR & payroll). Needs HTTPS or a Chrome exception for this address. --}}
+                    <video x-ref="video" x-show="camera" autoplay muted playsinline class="mx-auto mb-3 h-24 rounded ring-1 ring-gray-200" aria-label="Camera"></video>
+                @endif
 
                 <label for="pin" class="block text-sm font-medium text-gray-700">PIN <span x-text="userName ? 'for ' + userName : ''"></span></label>
                 <input

@@ -668,13 +668,13 @@ payslip_lines:    id, payslip_id, component_name, type, amount
 ```
 
 ### Work items
-- [ ] Employee pages (Super Admin), link employee ↔ user login.
-- [ ] **Clock in via POS:** first successful PIN login of the day creates `attendances.clock_in` (optional webcam snapshot via `getUserMedia`); explicit "Clock out" button in the POS top bar; missing clock-out flagged next morning.
-- [ ] Attendance calendar (monthly grid per employee), daily attendance sheet, manual correction with reason (audited).
-- [ ] Holidays (Poya/public), shifts, late/OT rules in settings.
-- [ ] Leave requests (Super Admin approves), leave balances.
-- [ ] Salary advances with recovery schedule.
-- [ ] **Payroll run:** choose month → calculate per employee:
+- [x] Employee pages (Super Admin), link employee ↔ user login. *(Code E-001…; salary components ticked per employee with an optional own amount.)*
+- [x] **Clock in via POS:** first successful PIN login of the day creates `attendances.clock_in` (optional webcam snapshot via `getUserMedia`); explicit "Clock out" button in the POS top bar; missing clock-out flagged next morning. *(Photo is off by default (Settings → HR & payroll) and needs HTTPS or a Chrome exception. Clock in/out also in the back-office user menu on a registered terminal. Bell at 07:15.)*
+- [x] Attendance calendar (monthly grid per employee), daily attendance sheet, manual correction with reason (audited). *(One grid for all employees; click a day to correct it.)*
+- [x] Holidays (Poya/public), shifts, late/OT rules in settings. *(Holiday dates are entered by the owner each year; none are seeded.)*
+- [x] Leave requests (Super Admin approves), leave balances. *(Staff ask on My attendance; half days; working days only; approved leave writes LEAVE rows into the attendance.)*
+- [x] Salary advances with recovery schedule. *(Equal monthly installments; the owner can change a month's amount on the payslip.)*
+- [x] **Payroll run:** choose month → calculate per employee:
   ```
   gross       = basic + Σallowances + OT (ot_hours × hourly_rate × ot_multiplier)
                 − no-pay deduction (absent days × basic / working_days)
@@ -683,8 +683,8 @@ payslip_lines:    id, payslip_id, component_name, type, amount
   etf          = epf_base × 3%
   net         = gross − epf_employee − advance installment − other deductions
   ```
-  review/edit → approve → pay (bank or cash) → journal → **payslip PDF (Sinhala/English)**.
-- [ ] Attendance and payroll reports; EPF/ETF monthly summary.
+  review/edit → approve → pay (bank or cash) → journal → **payslip PDF (Sinhala/English)**. *(Approval posts Dr Salaries + EPF/ETF expense, Cr EPF/ETF payable, Staff advances, Salaries payable; each payment then Dr Salaries payable, Cr drawer / cash at home / bank. EPF + ETF sent to the funds recorded per month. OT = hours × basic × 1.5 ÷ 240. EPF base = basic − no-pay + allowances marked "EPF applies". An approved payroll can be reopened until someone is paid.)*
+- [x] Attendance and payroll reports; EPF/ETF monthly summary.
 
 ### Tests
 - Late/OT calculation around shift boundaries and grace minutes.

@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             DocumentSequenceSeeder::class,
             CatalogSeeder::class,
             ChartOfAccountsSeeder::class,
+            HrSeeder::class,
         ]);
 
         if (app()->environment('local')) {
@@ -25,6 +26,7 @@ class DatabaseSeeder extends Seeder
                 DevelopmentCatalogSeeder::class,
                 DevelopmentCustomerSeeder::class,
                 DevelopmentFinanceSeeder::class,
+                DevelopmentHrSeeder::class,
             ]);
         }
     }

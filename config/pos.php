@@ -152,6 +152,16 @@ return [
             'cheque_alert' => true,
             'cheque_alert_days' => 3,
         ],
+        'hr' => [
+            'epf_employee_rate' => 8,
+            'epf_employer_rate' => 12,
+            'etf_rate' => 3,
+            'ot_multiplier' => 1.5,
+            'ot_hours_divisor' => 240,
+            'ot_min_minutes' => 30,
+            'clock_in_photo' => false,
+            'missing_clock_out_alert' => true,
+        ],
     ],
 
 ];

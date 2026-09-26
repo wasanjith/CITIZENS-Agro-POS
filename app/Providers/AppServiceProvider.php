@@ -12,6 +12,10 @@ use App\Domain\Finance\Models\BankTransaction;
 use App\Domain\Finance\Models\Cheque;
 use App\Domain\Finance\Models\Expense;
 use App\Domain\Finance\Models\JournalEntry;
+use App\Domain\HR\Models\Employee;
+use App\Domain\HR\Models\PayrollRun;
+use App\Domain\HR\Models\Payslip;
+use App\Domain\HR\Models\SalaryAdvance;
 use App\Domain\Identity\Services\CashierAuthority;
 use App\Domain\Identity\Services\DelegationService;
 use App\Domain\Identity\Support\CurrentTerminal;
@@ -72,6 +76,10 @@ class AppServiceProvider extends ServiceProvider
             'cheque' => Cheque::class,
             'expense' => Expense::class,
             'journal_entry' => JournalEntry::class,
+            'employee' => Employee::class,
+            'salary_advance' => SalaryAdvance::class,
+            'payroll_run' => PayrollRun::class,
+            'payslip' => Payslip::class,
         ]);
 
         $this->registerGates();

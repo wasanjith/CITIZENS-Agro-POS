@@ -34,6 +34,15 @@ use App\Http\Controllers\Finance\ExpenseController;
 use App\Http\Controllers\Finance\FinancialReportController;
 use App\Http\Controllers\Finance\JournalController;
 use App\Http\Controllers\Finance\MoneyMoveController;
+use App\Http\Controllers\HR\AttendanceController;
+use App\Http\Controllers\HR\EmployeeController;
+use App\Http\Controllers\HR\HrReportController;
+use App\Http\Controllers\HR\HrSetupController;
+use App\Http\Controllers\HR\LeaveController;
+use App\Http\Controllers\HR\PayrollController;
+use App\Http\Controllers\HR\PayslipController;
+use App\Http\Controllers\HR\SalaryAdvanceController;
+use App\Http\Controllers\HR\SalaryComponentController;
 use App\Http\Controllers\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Inventory\StockController;
 use App\Http\Controllers\Inventory\StockMovementController;
@@ -302,6 +311,68 @@ Route::middleware('auth')->group(function () {
         Route::get('reports/profit-and-loss', [FinancialReportController::class, 'profitAndLoss'])->name('reports.profit-loss');
         Route::get('reports/balance-sheet', [FinancialReportController::class, 'balanceSheet'])->name('reports.balance-sheet');
         Route::get('reports/cash-book', [FinancialReportController::class, 'cashBook'])->name('reports.cash-book');
+    });
+
+    /*
+    | Phase 6: HR, attendance and payroll. Employees, payroll and corrections belong to
+    | the Super Admin (never delegated); the Manager sees attendance; everyone clocks
+    | in and out and asks for leave.
+    */
+    Route::prefix('hr')->name('hr.')->group(function () {
+        Route::get('my-attendance', [AttendanceController::class, 'mine'])->name('attendance.mine');
+        Route::post('clock-in', [AttendanceController::class, 'clockIn'])->name('clock-in');
+        Route::post('clock-out', [AttendanceController::class, 'clockOut'])->name('clock-out');
+        Route::post('my-leave', [LeaveController::class, 'requestOwn'])->name('leave.request');
+
+        Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+        Route::get('attendance/month', [AttendanceController::class, 'month'])->name('attendance.month');
+        Route::put('attendance', [AttendanceController::class, 'update'])->name('attendance.update');
+        Route::get('attendance/{attendance}/photo', [AttendanceController::class, 'photo'])->name('attendance.photo');
+
+        Route::get('leave', [LeaveController::class, 'index'])->name('leave.index');
+        Route::post('leave', [LeaveController::class, 'store'])->name('leave.store');
+        Route::post('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->name('leave.approve');
+        Route::post('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->name('leave.reject');
+        Route::post('leave/{leaveRequest}/cancel', [LeaveController::class, 'cancel'])->name('leave.cancel');
+
+        Route::resource('employees', EmployeeController::class)->except(['destroy']);
+
+        Route::get('setup', [HrSetupController::class, 'index'])->name('setup.index');
+        Route::post('shifts', [HrSetupController::class, 'storeShift'])->name('shifts.store');
+        Route::put('shifts/{shift}', [HrSetupController::class, 'updateShift'])->name('shifts.update');
+        Route::post('holidays', [HrSetupController::class, 'storeHoliday'])->name('holidays.store');
+        Route::delete('holidays/{holiday}', [HrSetupController::class, 'destroyHoliday'])->name('holidays.destroy');
+        Route::post('leave-types', [HrSetupController::class, 'storeLeaveType'])->name('leave-types.store');
+        Route::put('leave-types/{leaveType}', [HrSetupController::class, 'updateLeaveType'])->name('leave-types.update');
+
+        Route::get('salary-components', [SalaryComponentController::class, 'index'])->name('components.index');
+        Route::post('salary-components', [SalaryComponentController::class, 'store'])->name('components.store');
+        Route::put('salary-components/{salaryComponent}', [SalaryComponentController::class, 'update'])->name('components.update');
+
+        Route::get('advances', [SalaryAdvanceController::class, 'index'])->name('advances.index');
+        Route::get('advances/create', [SalaryAdvanceController::class, 'create'])->name('advances.create');
+        Route::post('advances', [SalaryAdvanceController::class, 'store'])->name('advances.store');
+        Route::get('advances/{advance}', [SalaryAdvanceController::class, 'show'])->name('advances.show');
+        Route::post('advances/{advance}/cancel', [SalaryAdvanceController::class, 'cancel'])->name('advances.cancel');
+
+        Route::get('payroll', [PayrollController::class, 'index'])->name('payroll.index');
+        Route::post('payroll', [PayrollController::class, 'store'])->name('payroll.store');
+        Route::get('payroll/{payroll}', [PayrollController::class, 'show'])->name('payroll.show');
+        Route::delete('payroll/{payroll}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
+        Route::post('payroll/{payroll}/recalculate', [PayrollController::class, 'recalculate'])->name('payroll.recalculate');
+        Route::post('payroll/{payroll}/approve', [PayrollController::class, 'approve'])->name('payroll.approve');
+        Route::post('payroll/{payroll}/reopen', [PayrollController::class, 'reopen'])->name('payroll.reopen');
+        Route::post('payroll/{payroll}/pay', [PayrollController::class, 'pay'])->name('payroll.pay');
+        Route::post('payroll/{payroll}/epf-etf', [PayrollController::class, 'payEpfEtf'])->name('payroll.epf-etf');
+        Route::get('payroll/{payroll}/payslips.pdf', [PayrollController::class, 'pdf'])->name('payroll.pdf');
+
+        Route::get('payslips/{payslip}', [PayslipController::class, 'show'])->name('payslips.show');
+        Route::put('payslips/{payslip}', [PayslipController::class, 'update'])->name('payslips.update');
+        Route::get('payslips/{payslip}/pdf', [PayslipController::class, 'pdf'])->name('payslips.pdf');
+
+        Route::get('reports/attendance', [HrReportController::class, 'attendance'])->name('reports.attendance');
+        Route::get('reports/payroll', [HrReportController::class, 'payroll'])->name('reports.payroll');
+        Route::get('reports/epf-etf', [HrReportController::class, 'epfEtf'])->name('reports.epf-etf');
     });
 
     Route::prefix('admin')->name('admin.')->group(function () {

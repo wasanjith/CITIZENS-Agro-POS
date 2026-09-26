@@ -109,6 +109,10 @@
                 </button>
                 <div x-show="open" x-cloak x-transition class="absolute right-4 top-14 w-48 rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black/5">
                     <a href="{{ route('account') }}" class="block px-4 py-2 hover:bg-gray-50">My account</a>
+                    @can('hr.attendance.self')
+                        <a href="{{ route('hr.attendance.mine') }}" class="block px-4 py-2 hover:bg-gray-50">My attendance</a>
+                    @endcan
+                    @include('hr.partials.clock-button', ['style' => 'app'])
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="block w-full px-4 py-2 text-left hover:bg-gray-50">Sign out</button>
@@ -119,6 +123,7 @@
 
         <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
             <x-ui.flash class="mb-6" />
+            @error('attendance')<x-ui.alert type="error" class="mb-6">{{ $message }}</x-ui.alert>@enderror
             @if (session('print_url'))
                 {{-- A receipt to print on this PC's printer (the page prints itself, Chrome --kiosk-printing). --}}
                 <iframe src="{{ session('print_url') }}" title="Printing" aria-hidden="true" class="pointer-events-none fixed bottom-0 right-0 size-px border-0 opacity-0"></iframe>

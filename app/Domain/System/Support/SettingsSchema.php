@@ -86,6 +86,20 @@ class SettingsSchema
                     'cheque_alert_days' => ['label' => 'Warn about issued cheques falling due within (days)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:0', 'max:60']],
                 ],
             ],
+            'hr' => [
+                'title' => 'HR & payroll',
+                'description' => 'EPF / ETF rates, overtime and clock-in. Working hours are set per shift (HR → Shifts & holidays).',
+                'fields' => [
+                    'epf_employee_rate' => ['label' => 'EPF, employee share (% of EPF earnings)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:50']],
+                    'epf_employer_rate' => ['label' => 'EPF, employer share (%)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:50']],
+                    'etf_rate' => ['label' => 'ETF, employer (%)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:50']],
+                    'ot_multiplier' => ['label' => 'Overtime rate (times the normal hourly rate)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:1', 'max:5']],
+                    'ot_hours_divisor' => ['label' => 'Normal hourly rate = basic salary ÷', 'type' => 'number', 'rules' => ['required', 'integer', 'min:1', 'max:400'], 'hint' => '240 is usual for shop staff (Shop & Office Employees Act); 200 under the Wages Boards.'],
+                    'ot_min_minutes' => ['label' => 'Overtime counts only from (minutes after closing)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:0', 'max:240']],
+                    'clock_in_photo' => ['label' => 'Take a webcam photo at the PIN sign-in that clocks staff in', 'type' => 'checkbox', 'rules' => ['boolean'], 'hint' => 'The browser asks once for camera access on each terminal.'],
+                    'missing_clock_out_alert' => ['label' => 'Tell the owner every morning who did not clock out yesterday', 'type' => 'checkbox', 'rules' => ['boolean']],
+                ],
+            ],
         ];
     }
 }

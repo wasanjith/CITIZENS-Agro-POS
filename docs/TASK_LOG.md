@@ -9,12 +9,12 @@
 
 | Item | Status |
 |---|---|
-| **Current phase** | Phase 5: Finance & Banking (built; waiting for the real bank accounts and opening balances) |
-| **Last updated** | 2026-09-25 |
-| **Tests** | 374 Pest tests, all passing (Meilisearch was running, so none skipped). |
+| **Current phase** | Phase 6: HR, Attendance, Payroll (built; waiting for the staff list, shop hours, holidays and the owner's payroll answers) |
+| **Last updated** | 2026-09-26 |
+| **Tests** | 431 Pest tests, all passing (Meilisearch was running, so none skipped). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
-| **Next** | Owner: add the shop's bank accounts with their opening balances (Finance → Banking), then enter bank movements yourself (Move money, cheque deposits), and try an expense, a supplier payment and a customer cheque (deposit → cleared). Earlier checks still pending (product import, real PO/GRN, printers, real customer list) → Phase 6 (HR & Payroll) |
+| **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Earlier checks still pending (bank accounts, product import, real PO/GRN, printers, real customer list) → Phase 7 (Reports, Dashboard, Go-live) |
 
 ### Phase progress
 
@@ -26,7 +26,7 @@
 | 3 | POS core: counter invoices, settlement, Live Billing, handover | 🟡 Built · real printers, drawer and Reverb test pending |
 | 4 | Customers, Credit, Returns, Quotations | 🟡 Built · real customer list + in-shop credit/return run pending |
 | 5 | Finance & Banking | 🟡 Built · real bank accounts + opening balances pending |
-| 6 | HR, Attendance, Payroll | ⚪ Not started |
+| 6 | HR, Attendance, Payroll | 🟡 Built · staff list, shop hours, holidays and payroll rules pending |
 | 7 | Reports, Dashboard, Go-live | ⚪ Not started |
 
 ### Open questions for the owner
@@ -34,10 +34,13 @@
 1. **VAT:** is the shop VAT-registered? Any tax-exempt products? (A "VAT 18%" rate is seeded **inactive**; products have no tax until this is answered.)
 2. **Product list:** please fill the import template (Products → Import from Excel → Download template) or send the old system's export.
 3. **Short code ranges:** OK with Fertilizers 1000–1999, Seeds 2000–2999, Agro-chemicals 3000–3999, Tools 4000–4999, Bicycle Parts 5000–6999, Other 9000–9999? (Editable on the Categories page.)
-4. **Payroll:** calculate EPF/ETF, or simple basic + allowances − deductions? (needed for Phase 6)
+4. **Payroll:** built with EPF/ETF as in the plan, ticked per employee (untick "EPF / ETF member" for staff who are not in EPF; that gives simple basic + allowances − deductions). Please confirm: EPF 8 % + 12 %, ETF 3 %, overtime = 1.5 × basic ÷ 240 per hour, counted only from 30 minutes after closing (all in Settings → HR & payroll).
 5. **Printer model:** which 80 mm printer will be bought? Buy one first and run the printing test.
 6. **Real credit customers:** dummy customers are used for now (owner's choice, 2026-09-25). Before go-live, send the real list (name, phone, what each owes, limit, credit days).
 7. **Counter staff and customers:** the reply "can counter staff" looked cut off. For now counter staff can add customers (no credit) but not set credit limits. Please confirm, or say if staff should also set limits.
+8. **Shop hours:** the default shift is 08:00–18:00, Monday to Saturday, late after 10 minutes. Is the shop open on Sundays? Different hours for anyone?
+9. **Days with no attendance record:** a past working day with no clock-in and no leave counts as **absent (no pay)**. Is that right, or should such days be paid unless marked absent? (Until everyone clocks in every day, the first payroll will show no-pay days to correct.)
+10. **Allowances on no-pay days:** fixed allowances (transport, attendance …) are paid in full even when there are no-pay days; only the basic salary is cut. Should they be cut too?
 
 ---
 
@@ -85,11 +88,33 @@
 | 2026-09-25 | **Owner:** the owner enters the opening bank balances and every bank movement (deposits, transfers, cheque deposits). Card and bank-transfer payments wait under "Card & transfer payments" until moved into a bank (automatic posting can still be switched on per bank account). |
 | 2026-09-25 | **Owner:** the counted cash goes home at closing and the next day starts with the cashier's morning float brought from it. The "safe" account is shown as **Cash at home (day's takings)**. |
 
+| 2026-09-26 | **Attendance:** the first PIN sign-in of the day on a shop terminal clocks the employee in; they clock out with the button in the top bar. Late = after the shift start + grace minutes; overtime = minutes after the shift end (from 30 minutes); on a day off or a holiday every minute is overtime. Only the Super Admin corrects attendance (with a reason, audited); the Manager can view it. |
+| 2026-09-26 | **Payroll:** no-pay = no-pay days × basic ÷ working days; OT = hours × basic × 1.5 ÷ 240; EPF/ETF on basic − no-pay + allowances marked "EPF applies" (not on OT). Approving posts the salaries as owed (Dr Salaries, EPF/ETF expense; Cr Salaries payable, EPF/ETF payable, Staff advances); paying moves the money (drawer, cash at home or bank, one entry per person). An approved payroll can be reopened until someone is paid. Payroll, employees and advances are Super Admin only and can never be handed over. |
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-09-26: Collapsible sidebar
+- Sidebar topics are now collapsible groups, each with an icon and a chevron. Only the group holding the current page opens on load; the others open with a click.
+- Sub-pages sit on a vertical track line with a bullet for each page. The current page's bullet glows; the other bullets don't. Sidebar colours are unchanged.
+- Dashboard is a single top-level link. Rebuilt assets (`npm run build`); 431 tests still pass.
+
+### 2026-09-26: Phase 6 built (HR, Attendance, Payroll)
+- **Tables:** employees, shifts, attendances (one row per employee and day), holidays, leave_types, leave_requests, salary_components (+ per-employee amounts), salary_advances (+ recoveries), payroll_runs, payslips, payslip_lines. New numbers: `E-001` (employees), `ADV-` (advances).
+- **Clock in / out:** first PIN sign-in of the day on a registered terminal clocks the employee in (a second sign-in changes nothing); "Clock out" in the POS top bar and the user menu; "Clock in" there too for someone who signed in with a password. Late, early-leave and overtime minutes come from the shift. Optional webcam photo at the PIN screen (Settings → HR & payroll, off by default; needs HTTPS or a Chrome exception). Morning bell at 07:15 about yesterday's missing clock-outs.
+- **Attendance pages:** daily sheet, month grid for everyone (P / ½ / L / A / H, "?" = no record), click a day to correct it (status, times, reason; audited). Manager: view only. Staff: **My attendance** (their days, leave left, ask for leave).
+- **Leave:** staff ask, the owner approves / rejects / cancels, or enters leave directly. Working days only, half days, yearly balances (seeded: annual 14, casual 7, no-pay). Approved leave writes LEAVE rows into the attendance.
+- **Shifts, holidays & leave types** page; **Allowances & deductions** (fixed or % of basic, "EPF applies"), ticked per employee with an optional own amount.
+- **Salary advances:** from the drawer, cash at home or a bank; recovered in equal monthly installments; can be cancelled until an installment is taken.
+- **Payroll:** choose the month → calculate → check / edit each payslip (no-pay days, OT hours, advance amount, bonus or extra deduction, note) → approve → pay (tick people; drawer, cash at home or bank) → record EPF + ETF paid. Payslip PDF in Sinhala, English or both (two per A4 page when they fit).
+- **Reports:** attendance summary (month), payroll summary (year, by month and by employee), EPF / ETF list (month).
+- **Menu:** new "HR & Payroll" section; Settings → HR & payroll (EPF/ETF rates, OT rate and divisor, OT minimum, photo, missing clock-out bell).
+- **Tests:** 57 new (431 total): late/OT around the shift and grace minutes, day off and holiday OT, PIN clock-in once a day, photo only when switched on, corrections and who may make them, missing clock-out bell, leave days/balances/half days/cancel, a full payroll worked out by hand (no-pay, paid leave, OT, allowances, EPF on/off, advance), joining mid-month, approve / pay / EPF-ETF postings with the books checked after each test, reopen, delete, and that a Manager cannot open payroll even while holding cashier authority. Larastan 0 errors, Pint clean.
+- **Checked in headless Chrome** (throwaway database `citizensDB_browser`, `php -S` on port 8123): every HR page, correcting a day in the month grid, calculate → edit payslip → approve → pay. Found and fixed two bugs: pages with salary components crashed (a Blade variable name clash) and the "Tick all" button on the pay form threw a JavaScript error. Rendered the payslip PDF: Sinhala prints correctly. The dev database was not touched by the check.
+- **This PC's `citizensDB`:** migrated; default shift and leave types added. No employees were added (`DevelopmentHrSeeder` adds four demo employees linked to the demo logins on `migrate:fresh --seed`).
+- **Set up on another PC:** `php artisan migrate`, `php artisan db:seed --class=DocumentSequenceSeeder`, `php artisan db:seed --class=HrSeeder`, `npm run build`. The scheduler must run for the 07:15 missing clock-out bell.
 
 ### 2026-09-25: Owner's answers on Phase 5
 - **Supplier returns at the buying price:** each line now uses what the shop paid the supplier (the goods receipt line the batch came from, else this product's line on the chosen goods receipt, net of that receipt's discount; else the supplier's last price). The supplier's balance goes down by that amount; the stock leaves at its stock cost and the difference is posted as a stock gain or loss. The return page shows "Buying price".

@@ -14,6 +14,10 @@ use App\Domain\Finance\Enums\SystemAccount;
 use App\Domain\Finance\Models\BankAccount;
 use App\Domain\Finance\Services\ChartOfAccounts;
 use App\Domain\Finance\Services\FinancialReports;
+use App\Domain\HR\Actions\SaveEmployeeAction;
+use App\Domain\HR\Models\Attendance;
+use App\Domain\HR\Models\Employee;
+use App\Domain\HR\Models\Holiday;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Identity\Models\Printer;
 use App\Domain\Identity\Models\Terminal;
@@ -31,6 +35,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -373,5 +378,69 @@ function expectBooksBalance(): void
 
     foreach (BankAccount::with('account')->get() as $bank) {
         expect((string) $bank->account->balance())->toBe((string) $bank->balance(), "Ledger of {$bank->displayName()} ≠ its bank book");
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| HR helpers (Phase 6)
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * An employee created the way the employee form does. Needs HrSeeder (default shift, leave types).
+ *
+ * @param  array<int, array{assigned: bool, value?: string|null}>  $components
+ */
+function employee(array $attributes = [], ?User $user = null, array $components = []): Employee
+{
+    return app(SaveEmployeeAction::class)->handle([
+        'full_name' => 'Nimal Bandara',
+        'join_date' => '2025-01-01',
+        'employment_type' => 'permanent',
+        'basic_salary' => '50000',
+        'is_epf_member' => true,
+        'is_active' => true,
+        'user_id' => $user?->id,
+        'components' => $components,
+        ...$attributes,
+    ])->refresh();
+}
+
+/**
+ * Mark every working day of the month (shift days, not holidays) up to today as present
+ * 08:00–18:00, except the days given (Y-m-d => status or null for no record).
+ *
+ * @param  array<string, string|null>  $except
+ */
+function presentAllMonth(Employee $employee, string $month, array $except = []): void
+{
+    $start = Carbon::parse($month.'-01');
+    $shift = $employee->workingShift();
+    $holidays = Holiday::between($start, $start->copy()->endOfMonth());
+
+    for ($day = $start->copy(); $day->lte($start->copy()->endOfMonth()) && $day->lte(today()); $day->addDay()) {
+        $key = $day->toDateString();
+
+        if (! $shift->worksOn($day) || isset($holidays[$key])) {
+            continue;
+        }
+
+        if (array_key_exists($key, $except)) {
+            if ($except[$key] !== null) {
+                Attendance::create(['employee_id' => $employee->id, 'date' => $key, 'source' => 'manual', 'status' => $except[$key]]);
+            }
+
+            continue;
+        }
+
+        Attendance::create([
+            'employee_id' => $employee->id,
+            'date' => $key,
+            'clock_in' => $key.' 08:00:00',
+            'clock_out' => $key.' 18:00:00',
+            'source' => 'pos',
+            'status' => 'present',
+        ]);
     }
 }

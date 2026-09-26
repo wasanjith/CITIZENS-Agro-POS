@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Domain\Identity\Support\CurrentTerminal;
+use App\Domain\System\Services\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -17,10 +18,11 @@ use Illuminate\View\View;
  */
 class PinLoginController extends Controller
 {
-    public function create(CurrentTerminal $currentTerminal): View
+    public function create(CurrentTerminal $currentTerminal, Settings $settings): View
     {
         return view('auth.pin-login', [
             'terminal' => $currentTerminal->get(),
+            'clockInPhoto' => (bool) $settings->get('hr.clock_in_photo', false),
             'users' => User::query()
                 ->active()
                 ->whereNotNull('pin_hash')
@@ -37,6 +39,8 @@ class PinLoginController extends Controller
         $validated = $request->validate([
             'user_id' => ['required', 'integer'],
             'pin' => ['required', 'digits_between:'.$pin['min_length'].','.$pin['max_length']],
+            // Webcam snapshot for the clock-in (Settings → HR & payroll); checked again when stored.
+            'photo' => ['nullable', 'string', 'max:1000000'],
         ]);
 
         $terminal = $currentTerminal->get();
