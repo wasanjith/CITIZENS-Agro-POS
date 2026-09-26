@@ -4,6 +4,8 @@ namespace App\Domain\Customers\Models;
 
 use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\Customers\Policies\CustomerPaymentPolicy;
+use App\Domain\Finance\Models\BankAccount;
+use App\Domain\Finance\Models\Cheque;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Inventory\Support\StockReference;
 use App\Domain\Sales\Enums\PaymentMethod;
@@ -29,6 +31,9 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string $amount
  * @property PaymentMethod $method
  * @property string|null $reference
+ * @property int|null $cheque_id
+ * @property int|null $bank_account_id
+ * @property Carbon|null $reversed_at
  * @property int|null $drawer_session_id
  * @property int|null $terminal_id
  * @property int $received_by
@@ -52,6 +57,9 @@ class CustomerPayment extends Model implements StockReference
             'date' => 'date',
             'amount' => 'decimal:2',
             'method' => PaymentMethod::class,
+            'cheque_id' => 'integer',
+            'bank_account_id' => 'integer',
+            'reversed_at' => 'datetime',
             'drawer_session_id' => 'integer',
             'terminal_id' => 'integer',
             'received_by' => 'integer',
@@ -88,6 +96,22 @@ class CustomerPayment extends Model implements StockReference
     public function receivedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    /**
+     * @return BelongsTo<BankAccount, $this>
+     */
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
+    /**
+     * @return BelongsTo<Cheque, $this>
+     */
+    public function cheque(): BelongsTo
+    {
+        return $this->belongsTo(Cheque::class);
     }
 
     /**

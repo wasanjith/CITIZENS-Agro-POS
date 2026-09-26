@@ -2,6 +2,7 @@
 
 namespace App\Domain\System\Services;
 
+use App\Domain\System\Enums\SequenceResetPeriod;
 use App\Domain\System\Models\DocumentSequence;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -40,6 +41,26 @@ class DocumentNumber
 
             return $this->format($sequence->prefix, $number, $sequence->padding);
         });
+    }
+
+    /**
+     * Create the sequence if it does not exist yet (documents added after go-live).
+     */
+    public function ensure(string $type, string $prefix, int $padding, SequenceResetPeriod $reset = SequenceResetPeriod::Yearly): void
+    {
+        if (DocumentSequence::query()->where('type', $type)->exists()) {
+            return;
+        }
+
+        DocumentSequence::query()->toBase()->upsert([[
+            'type' => $type,
+            'prefix' => $prefix,
+            'padding' => $padding,
+            'reset_period' => $reset->value,
+            'next_number' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]], ['type'], ['type']);
     }
 
     public function format(string $prefix, int $number, int $padding): string

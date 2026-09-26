@@ -9,6 +9,7 @@ enum CustomerLedgerType: string
     case Payment = 'payment';
     case Return = 'return';
     case Adjustment = 'adjustment';
+    case ChequeBounced = 'cheque_bounced';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum CustomerLedgerType: string
             self::Payment => 'Payment',
             self::Return => 'Return',
             self::Adjustment => 'Adjustment',
+            self::ChequeBounced => 'Cheque bounced',
         };
     }
 
@@ -32,6 +34,7 @@ enum CustomerLedgerType: string
             self::Payment => 'ගෙවීම',
             self::Return => 'ආපසු භාරදීම',
             self::Adjustment => 'ගැලපීම',
+            self::ChequeBounced => 'චෙක්පත ආපසු හැරවිණි',
         };
     }
 }

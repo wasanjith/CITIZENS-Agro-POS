@@ -26,6 +26,14 @@ use App\Http\Controllers\Catalog\UnitController;
 use App\Http\Controllers\Customers\CustomerController;
 use App\Http\Controllers\Customers\CustomerPaymentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Finance\AccountController as FinanceAccountController;
+use App\Http\Controllers\Finance\BankAccountController;
+use App\Http\Controllers\Finance\ChequeController;
+use App\Http\Controllers\Finance\ExpenseCategoryController;
+use App\Http\Controllers\Finance\ExpenseController;
+use App\Http\Controllers\Finance\FinancialReportController;
+use App\Http\Controllers\Finance\JournalController;
+use App\Http\Controllers\Finance\MoneyMoveController;
 use App\Http\Controllers\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Inventory\StockController;
 use App\Http\Controllers\Inventory\StockMovementController;
@@ -45,6 +53,7 @@ use App\Http\Controllers\Pos\QuotationController as PosQuotationController;
 use App\Http\Controllers\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Purchasing\SupplierController;
+use App\Http\Controllers\Purchasing\SupplierPaymentController;
 use App\Http\Controllers\Purchasing\SupplierReturnController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\Sales\QuotationController;
@@ -240,6 +249,59 @@ Route::middleware('auth')->group(function () {
         Route::post('goods-receipts/{goods_receipt}/cancel', [GoodsReceiptController::class, 'cancel'])->name('goods-receipts.cancel');
 
         Route::resource('supplier-returns', SupplierReturnController::class)->only(['index', 'create', 'store', 'show']);
+
+        Route::get('supplier-payments', [SupplierPaymentController::class, 'index'])->name('supplier-payments.index');
+        Route::get('supplier-payments/create', [SupplierPaymentController::class, 'create'])->name('supplier-payments.create');
+        Route::post('suppliers/{supplier}/payments', [SupplierPaymentController::class, 'store'])->name('supplier-payments.store');
+        Route::get('supplier-payments/{supplierPayment}', [SupplierPaymentController::class, 'show'])->name('supplier-payments.show');
+    });
+
+    /*
+    | Phase 5: Finance & Banking. Banks, cheques, the journal and the financial reports
+    | belong to the Super Admin (never delegated); the Manager records petty-cash expenses.
+    */
+    Route::prefix('finance')->name('finance.')->group(function () {
+        Route::get('bank-accounts', [BankAccountController::class, 'index'])->name('bank-accounts.index');
+        Route::get('bank-accounts/create', [BankAccountController::class, 'create'])->name('bank-accounts.create');
+        Route::post('bank-accounts', [BankAccountController::class, 'store'])->name('bank-accounts.store');
+        Route::get('bank-accounts/{bankAccount}', [BankAccountController::class, 'show'])->name('bank-accounts.show');
+        Route::get('bank-accounts/{bankAccount}/edit', [BankAccountController::class, 'edit'])->name('bank-accounts.edit');
+        Route::put('bank-accounts/{bankAccount}', [BankAccountController::class, 'update'])->name('bank-accounts.update');
+        Route::post('bank-accounts/{bankAccount}/charges', [BankAccountController::class, 'charge'])->name('bank-accounts.charge');
+        Route::get('bank-accounts/{bankAccount}/reconcile', [BankAccountController::class, 'reconcileForm'])->name('bank-accounts.reconcile');
+        Route::post('bank-accounts/{bankAccount}/reconcile', [BankAccountController::class, 'reconcile'])->name('bank-accounts.reconcile.store');
+
+        Route::get('move-money', [MoneyMoveController::class, 'create'])->name('money.create');
+        Route::post('move-money', [MoneyMoveController::class, 'store'])->name('money.store');
+
+        Route::get('cheques', [ChequeController::class, 'index'])->name('cheques.index');
+        Route::get('cheques/calendar', [ChequeController::class, 'calendar'])->name('cheques.calendar');
+        Route::get('cheques/{cheque}', [ChequeController::class, 'show'])->name('cheques.show');
+        Route::put('cheques/{cheque}', [ChequeController::class, 'update'])->name('cheques.update');
+        Route::post('cheques/{cheque}/deposit', [ChequeController::class, 'deposit'])->name('cheques.deposit');
+        Route::post('cheques/{cheque}/clear', [ChequeController::class, 'clear'])->name('cheques.clear');
+        Route::post('cheques/{cheque}/bounce', [ChequeController::class, 'bounce'])->name('cheques.bounce');
+        Route::post('cheques/{cheque}/cancel', [ChequeController::class, 'cancel'])->name('cheques.cancel');
+
+        Route::get('expenses', [ExpenseController::class, 'index'])->name('expenses.index');
+        Route::get('expenses/create', [ExpenseController::class, 'create'])->name('expenses.create');
+        Route::post('expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+        Route::get('expenses/{expense}', [ExpenseController::class, 'show'])->name('expenses.show');
+        Route::get('expenses/{expense}/receipt', [ExpenseController::class, 'receipt'])->name('expenses.receipt');
+        Route::post('expenses/{expense}/cancel', [ExpenseController::class, 'cancel'])->name('expenses.cancel');
+
+        Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->name('expense-categories.index');
+        Route::post('expense-categories', [ExpenseCategoryController::class, 'store'])->name('expense-categories.store');
+        Route::put('expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'update'])->name('expense-categories.update');
+
+        Route::resource('accounts', FinanceAccountController::class)->except(['destroy']);
+        Route::get('journal', [JournalController::class, 'index'])->name('journal.index');
+        Route::get('journal/{journalEntry}', [JournalController::class, 'show'])->name('journal.show');
+
+        Route::get('reports/trial-balance', [FinancialReportController::class, 'trialBalance'])->name('reports.trial-balance');
+        Route::get('reports/profit-and-loss', [FinancialReportController::class, 'profitAndLoss'])->name('reports.profit-loss');
+        Route::get('reports/balance-sheet', [FinancialReportController::class, 'balanceSheet'])->name('reports.balance-sheet');
+        Route::get('reports/cash-book', [FinancialReportController::class, 'cashBook'])->name('reports.cash-book');
     });
 
     Route::prefix('admin')->name('admin.')->group(function () {

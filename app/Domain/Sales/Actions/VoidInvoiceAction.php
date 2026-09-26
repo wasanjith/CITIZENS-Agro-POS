@@ -6,6 +6,7 @@ use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Customers\Enums\CustomerLedgerType;
 use App\Domain\Customers\Services\CustomerLedger;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\Batch;
 use App\Domain\Inventory\Services\StockService;
@@ -38,6 +39,7 @@ class VoidInvoiceAction
         private readonly CounterEventRecorder $recorder,
         private readonly LiveCartStore $store,
         private readonly CustomerLedger $ledger,
+        private readonly FinancePosting $finance,
     ) {}
 
     public function handle(Sale $sale, User $user, string $reason, ?DrawerSession $session = null): Sale
@@ -140,6 +142,8 @@ class VoidInvoiceAction
                 'drawer_session_id' => $session->id,
             ]);
         }
+
+        $this->finance->saleVoided($sale, $user->id);
     }
 
     /**

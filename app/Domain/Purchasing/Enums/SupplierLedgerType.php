@@ -7,6 +7,7 @@ enum SupplierLedgerType: string
     case GoodsReceipt = 'grn';
     case Return = 'return';
     case Payment = 'payment';
+    case PaymentReversed = 'payment_reversed';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum SupplierLedgerType: string
             self::GoodsReceipt => 'Goods received',
             self::Return => 'Return to supplier',
             self::Payment => 'Payment',
+            self::PaymentReversed => 'Cheque returned / cancelled',
         };
     }
 }

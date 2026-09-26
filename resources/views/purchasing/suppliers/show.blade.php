@@ -10,6 +10,9 @@
         @can('create', \App\Domain\Purchasing\Models\GoodsReceipt::class)
             <x-ui.button variant="secondary" :href="route('purchasing.goods-receipts.create', ['supplier_id' => $supplier->id])">Receive goods</x-ui.button>
         @endcan
+        @can('create', \App\Domain\Purchasing\Models\SupplierPayment::class)
+            <x-ui.button variant="secondary" :href="route('purchasing.supplier-payments.create', ['supplier' => $supplier->id])">Pay supplier</x-ui.button>
+        @endcan
         @can('update', $supplier)
             <x-ui.button :href="route('purchasing.suppliers.edit', $supplier)">Edit</x-ui.button>
         @endcan

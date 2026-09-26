@@ -7,6 +7,7 @@ use App\Domain\Catalog\Models\Product;
 use App\Domain\Customers\Enums\CustomerLedgerType;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Customers\Services\CustomerLedger;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Inventory\Enums\MovementType;
@@ -35,7 +36,7 @@ use Illuminate\Validation\ValidationException;
  *
  * One transaction: lock the sale, release its reservation, issue the stock FEFO (batch
  * costs → COGS), record the payment in the cashier's open drawer session and mark the
- * sale SETTLED. Settling twice with the same key returns the first settlement.
+ * sale SETTLED, with its journal entry. Settling twice with the same key returns the first settlement.
  */
 class SettleInvoiceAction
 {
@@ -43,6 +44,7 @@ class SettleInvoiceAction
         private readonly StockService $stock,
         private readonly CounterEventRecorder $recorder,
         private readonly CustomerLedger $ledger,
+        private readonly FinancePosting $finance,
     ) {}
 
     /**
@@ -106,7 +108,7 @@ class SettleInvoiceAction
                 $costTotal = $costTotal->plus($itemCost);
             }
 
-            Payment::create([
+            $salePayment = Payment::create([
                 'sale_id' => $sale->id,
                 'method' => $method,
                 'amount' => $sale->total,
@@ -137,6 +139,8 @@ class SettleInvoiceAction
                 // The shop's copy for the customer's signature and the shop seal, on the main printer.
                 $creditBill = PrintJob::record(PrintDocumentType::CreditBill, $sale->id, $terminal->loadMissing('printer'), $cashier->id);
             }
+
+            $this->finance->saleSettled($sale, $salePayment, $cashier->id);
 
             $event = $this->recorder->record($sale->invoiced_terminal_id, $cashier->id, CounterEventType::Settled, null, [
                 'total' => $sale->total,

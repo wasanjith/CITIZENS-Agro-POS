@@ -8,11 +8,19 @@ use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\Unit;
 use App\Domain\Customers\Models\Customer;
+use App\Domain\Finance\Actions\SaveBankAccountAction;
+use App\Domain\Finance\Enums\BankAccountType;
+use App\Domain\Finance\Enums\SystemAccount;
+use App\Domain\Finance\Models\BankAccount;
+use App\Domain\Finance\Services\ChartOfAccounts;
+use App\Domain\Finance\Services\FinancialReports;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Identity\Models\Printer;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Identity\Services\TerminalRegistrar;
 use App\Domain\Inventory\Services\StockService;
+use App\Domain\Purchasing\Models\GoodsReceipt;
+use App\Domain\Purchasing\Models\Supplier;
 use App\Domain\Sales\Actions\IssueCounterInvoiceAction;
 use App\Domain\Sales\Models\Sale;
 use App\Models\User;
@@ -291,4 +299,79 @@ function counterInvoice(array $pos, array $lines, array $extra = []): Sale
 function cashierSettle(array $pos, User $user, Sale $sale, array $extra = []): TestResponse
 {
     return atTerminal($pos['mainToken'], $user)->postJson(route('api.pos.sales.settle', $sale), ['idempotency_key' => Str::random(32), ...$extra]);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Finance helpers (Phase 5)
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * A bank account created the way the bank account form does (ledger account + opening balance).
+ */
+function bankAccount(array $attributes = []): BankAccount
+{
+    return app(SaveBankAccountAction::class)->handle([
+        'bank_name' => 'Bank of Ceylon',
+        'branch' => 'Kurunegala',
+        'account_no' => (string) fake()->unique()->numerify('00########'),
+        'account_name' => 'Citizens Agro',
+        'type' => BankAccountType::Current,
+        'opening_balance' => '0.00',
+        'opening_date' => today(),
+        'receives_card_payments' => false,
+        'is_active' => true,
+        ...$attributes,
+    ], User::role(Role::SuperAdmin->value)->first() ?? userWithRole(Role::SuperAdmin));
+}
+
+/**
+ * Post a goods receipt without a purchase order: $bags bags of $product at $costPerBag.
+ */
+function directGrn(User $user, Supplier $supplier, Product $product, string $bags, string $costPerBag): GoodsReceipt
+{
+    test()->actingAs($user)->post(route('purchasing.goods-receipts.store'), [
+        'supplier_id' => $supplier->id,
+        'purchase_order_id' => '',
+        'supplier_invoice_no' => 'SINV-'.fake()->unique()->numberBetween(100, 999),
+        'received_at' => now()->subMinute()->format('Y-m-d H:i'),
+        'lines' => [[
+            'po_line_id' => '',
+            'product_id' => $product->id,
+            'variant_id' => '',
+            'unit_id' => unitId('bag'),
+            'qty' => $bags,
+            'free_qty' => '',
+            'unit_cost' => $costPerBag,
+        ]],
+        'action' => 'post',
+    ])->assertSessionHasNoErrors();
+
+    return GoodsReceipt::query()->latest('id')->firstOrFail();
+}
+
+/**
+ * Invariants of the books: every entry balances, the trial balance balances, and the
+ * receivable, payable and bank ledger accounts agree with the customer ledger, the
+ * supplier ledger and the bank books.
+ */
+function expectBooksBalance(): void
+{
+    $unbalanced = DB::table('journal_lines')->groupBy('journal_entry_id')->havingRaw('SUM(debit) <> SUM(credit)')->pluck('journal_entry_id');
+    expect($unbalanced)->toBeEmpty('Unbalanced journal entries: '.$unbalanced->implode(', '));
+
+    expect(app(FinancialReports::class)->trialBalance(today()->addYear())['balanced'])->toBeTrue();
+
+    $balance = fn (SystemAccount $account): string => (string) app(ChartOfAccounts::class)->get($account)->balance();
+
+    $customers = Customer::withTrashed()->get()->reduce(fn (BigDecimal $sum, Customer $customer) => $sum->plus($customer->balance()), BigDecimal::of('0.00'));
+    expect($balance(SystemAccount::AccountsReceivable))->toBe((string) $customers, 'Receivable ≠ customer ledger');
+
+    $suppliers = Supplier::withTrashed()->get()->reduce(fn (BigDecimal $sum, Supplier $supplier) => $sum->plus($supplier->balance()), BigDecimal::of('0.00'));
+    expect($balance(SystemAccount::AccountsPayable))->toBe((string) $suppliers->toScale(2), 'Payable ≠ supplier ledger');
+
+    foreach (BankAccount::with('account')->get() as $bank) {
+        expect((string) $bank->account->balance())->toBe((string) $bank->balance(), "Ledger of {$bank->displayName()} ≠ its bank book");
+    }
 }

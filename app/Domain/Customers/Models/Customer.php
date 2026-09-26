@@ -4,6 +4,7 @@ namespace App\Domain\Customers\Models;
 
 use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Customers\Policies\CustomerPolicy;
+use App\Domain\Inventory\Support\StockReference;
 use App\Domain\Sales\Enums\SaleStatus;
 use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Support\Money;
@@ -44,7 +45,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable(['code', 'name', 'name_si', 'phone', 'nic', 'address', 'area', 'price_list_id', 'credit_limit', 'credit_days', 'is_active', 'notes', 'created_by'])]
 #[UseFactory(CustomerFactory::class)]
 #[UsePolicy(CustomerPolicy::class)]
-class Customer extends Model
+class Customer extends Model implements StockReference
 {
     /** @use HasFactory<CustomerFactory> */
     use HasFactory, LogsActivity, SoftDeletes;
@@ -154,6 +155,16 @@ class Customer extends Model
         }
 
         return str_starts_with($digits, '0') ? '94'.substr($digits, 1) : $digits;
+    }
+
+    public function referenceLabel(): string
+    {
+        return $this->code;
+    }
+
+    public function referenceUrl(): ?string
+    {
+        return route('customers.show', $this);
     }
 
     public function displayName(): string

@@ -3,6 +3,8 @@
 namespace App\Domain\Purchasing\Models;
 
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Inventory\Support\StockReference;
+use App\Domain\Purchasing\Enums\GoodsReceiptStatus;
 use App\Domain\Purchasing\Policies\SupplierPolicy;
 use Brick\Math\BigDecimal;
 use Database\Factories\SupplierFactory;
@@ -32,7 +34,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable(['name', 'contact_person', 'phone', 'email', 'address', 'payment_terms_days', 'opening_balance', 'is_active'])]
 #[UseFactory(SupplierFactory::class)]
 #[UsePolicy(SupplierPolicy::class)]
-class Supplier extends Model
+class Supplier extends Model implements StockReference
 {
     /** @use HasFactory<SupplierFactory> */
     use HasFactory, LogsActivity, SoftDeletes;
@@ -80,6 +82,16 @@ class Supplier extends Model
     /**
      * Phone number in the international format wa.me expects (0771234567 → 94771234567).
      */
+    public function referenceLabel(): string
+    {
+        return $this->name;
+    }
+
+    public function referenceUrl(): ?string
+    {
+        return route('purchasing.suppliers.show', $this);
+    }
+
     public function whatsappNumber(): ?string
     {
         $digits = preg_replace('/\D+/', '', (string) $this->phone) ?? '';
@@ -119,6 +131,28 @@ class Supplier extends Model
     public function goodsReceipts(): HasMany
     {
         return $this->hasMany(GoodsReceipt::class);
+    }
+
+    /**
+     * Posted goods receipts not fully paid, oldest first.
+     *
+     * @return HasMany<GoodsReceipt, $this>
+     */
+    public function unpaidReceipts(): HasMany
+    {
+        return $this->hasMany(GoodsReceipt::class)
+            ->where('status', GoodsReceiptStatus::Posted)
+            ->whereColumn('amount_paid', '<', 'total')
+            ->orderBy('received_at')
+            ->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<SupplierPayment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(SupplierPayment::class);
     }
 
     /**

@@ -14,7 +14,7 @@
                     <th>Product</th>
                     <th>Batch</th>
                     <th class="text-right">Quantity</th>
-                    <th class="text-right">Unit cost</th>
+                    <th class="text-right">Buying price</th>
                     <th class="text-right">Value</th>
                 </x-slot:head>
                 @foreach ($return->lines as $line)

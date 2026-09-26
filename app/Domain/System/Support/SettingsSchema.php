@@ -78,6 +78,14 @@ class SettingsSchema
                     'overdue_alert' => ['label' => 'Tell the owner every morning about overdue credit', 'type' => 'checkbox', 'rules' => ['boolean']],
                 ],
             ],
+            'finance' => [
+                'title' => 'Finance',
+                'description' => 'Cheque reminders. Card and bank-transfer payments go to the bank account marked for them (Finance → Bank accounts).',
+                'fields' => [
+                    'cheque_alert' => ['label' => 'Tell the owner every morning about cheques to deposit and cheques falling due', 'type' => 'checkbox', 'rules' => ['boolean']],
+                    'cheque_alert_days' => ['label' => 'Warn about issued cheques falling due within (days)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:0', 'max:60']],
+                ],
+            ],
         ];
     }
 }

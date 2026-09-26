@@ -2,6 +2,8 @@
 
 use App\Domain\CashDrawer\Jobs\ProcessExpiredDelegationsJob;
 use App\Domain\Customers\Jobs\OverdueCreditReminderJob;
+use App\Domain\Finance\Jobs\ChequesDueReminderJob;
+use App\Domain\Finance\Services\JournalBackfill;
 use App\Domain\Identity\Actions\SaveUserAction;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Inventory\Actions\PostOpeningStockAction;
@@ -47,8 +49,19 @@ Artisan::command('inventory:post-opening-stock', function (PostOpeningStockActio
     $this->info("{$count} opening stock ".str('entry')->plural($count).' posted.');
 })->purpose('Post opening stock from the product import as OPENING stock movements');
 
+Artisan::command('finance:backfill-journals', function (JournalBackfill $backfill) {
+    $counts = $backfill->run();
+
+    foreach ($counts as $label => $count) {
+        $this->line(str_pad($label, 24).$count);
+    }
+
+    $this->info(array_sum($counts).' documents checked. Entries already posted are skipped.');
+})->purpose('Post journal entries for documents created before Finance (Phase 5), oldest first');
+
 Schedule::job(new LowStockAndExpiryAlertJob)->dailyAt('07:00');
 Schedule::job(new ProcessExpiredDelegationsJob)->everyMinute();
 Schedule::job(new PruneCounterEventsJob)->dailyAt('02:30');
 Schedule::job(new RecalculateSalesVelocityJob)->dailyAt('02:45');
 Schedule::job(new OverdueCreditReminderJob)->dailyAt('07:05');
+Schedule::job(new ChequesDueReminderJob)->dailyAt('07:10');

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Inventory\Actions;
 
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Enums\StocktakeStatus;
 use App\Domain\Inventory\Models\Stocktake;
@@ -25,6 +26,7 @@ class PostStocktakeAction
     public function __construct(
         private readonly StockService $stock,
         private readonly Settings $settings,
+        private readonly FinancePosting $finance,
     ) {}
 
     public function handle(Stocktake $stocktake, User $actor): Stocktake
@@ -63,6 +65,8 @@ class PostStocktakeAction
             $stocktake->posted_by = $actor->id;
             $stocktake->posted_at = now();
             $stocktake->save();
+
+            $this->finance->stockCorrected($stocktake, $actor->id);
 
             return $stocktake;
         });

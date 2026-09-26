@@ -3,6 +3,7 @@
 namespace App\Domain\Purchasing\Actions;
 
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Services\StockService;
 use App\Domain\Purchasing\Enums\GoodsReceiptStatus;
@@ -26,12 +27,14 @@ use Illuminate\Validation\ValidationException;
  *   - purchase order lines received, PO → PARTIAL or RECEIVED
  *   - supplier credited with the GRN total
  *   - supplier_products.last_cost and the product's reference cost updated
+ *   - journal: Dr Inventory, Cr Accounts payable
  */
 class PostGoodsReceiptAction
 {
     public function __construct(
         private readonly StockService $stock,
         private readonly SupplierLedger $ledger,
+        private readonly FinancePosting $finance,
     ) {}
 
     public function handle(GoodsReceipt $receipt, User $actor): GoodsReceipt
@@ -136,6 +139,8 @@ class PostGoodsReceiptAction
             $receipt->status = GoodsReceiptStatus::Posted;
             $receipt->posted_at = now();
             $receipt->save();
+
+            $this->finance->goodsReceived($receipt, $actor->id);
 
             return $receipt;
         });

@@ -622,17 +622,17 @@ expenses:         id, number, date, category_id, amount, payment_method (CASH_DR
 ```
 
 ### Work items
-- [ ] Chart of accounts seeder (section 14 system accounts); accounts page (Super Admin).
-- [ ] `JournalService::post(source, lines)` — asserts Σdebit = Σcredit; entries immutable (reversal entries only).
-- [ ] Event listeners that post journals for every event in section 14 (`InvoiceSettled`, `InvoiceVoided`, `GoodsReceiptPosted`, `SupplierPaymentMade`, `CustomerPaymentReceived`, `SaleReturned`, `ExpenseRecorded`, `PayrollPaid`, `CashDeposited`, `ChequeCleared`, `ChequeBounced`, `StockAdjusted`).
-- [ ] Backfill command to post journals for sales/GRNs created in Phases 2–4.
-- [ ] Bank account pages: list with balances, transactions register, deposit/withdraw/transfer forms.
-- [ ] **Cash to bank:** from drawer/safe → bank deposit (cash movement + bank transaction + journal).
-- [ ] Cheque register: received cheques (from customers) → deposit → clear/bounce (bounce re-opens customer debt); issued cheques (to suppliers); **post-dated cheque calendar** with due alerts.
-- [ ] Supplier payments (cash/bank/cheque) with allocation to supplier invoices/GRNs.
-- [ ] Expenses (with photo of bill), petty cash from drawer.
-- [ ] Bank reconciliation page: tick transactions against statement, show difference.
-- [ ] Cash book, bank book, trial balance, P&L, balance sheet (basic).
+- [x] Chart of accounts seeder (section 14 system accounts); accounts page (Super Admin). *(System accounts are also created on first use, so posting never fails on a fresh database. Bank accounts get 15xx accounts, expense heads 6xxx.)*
+- [x] `JournalService::post(source, lines)` — asserts Σdebit = Σcredit; entries immutable (reversal entries only).
+- [x] Event listeners that post journals for every event in section 14 (`InvoiceSettled`, `InvoiceVoided`, `GoodsReceiptPosted`, `SupplierPaymentMade`, `CustomerPaymentReceived`, `SaleReturned`, `ExpenseRecorded`, `PayrollPaid`, `CashDeposited`, `ChequeCleared`, `ChequeBounced`, `StockAdjusted`). *(Built as `FinancePosting`, called inside each action's own transaction instead of listeners, so a document never exists without its entry. Payroll comes with Phase 6.)*
+- [x] Backfill command to post journals for sales/GRNs created in Phases 2–4. *(`php artisan finance:backfill-journals`; safe to run again.)*
+- [x] Bank account pages: list with balances, transactions register, deposit/withdraw/transfer forms. *(One "Move money" form for all moves; charges and interest on the bank page.)*
+- [x] **Cash to bank:** from drawer/safe → bank deposit (cash movement + bank transaction + journal).
+- [x] Cheque register: received cheques (from customers) → deposit → clear/bounce (bounce re-opens customer debt); issued cheques (to suppliers); **post-dated cheque calendar** with due alerts.
+- [x] Supplier payments (cash/bank/cheque) with allocation to supplier invoices/GRNs.
+- [x] Expenses (with photo of bill), petty cash from drawer.
+- [x] Bank reconciliation page: tick transactions against statement, show difference.
+- [x] Cash book, bank book, trial balance, P&L, balance sheet (basic).
 
 ### Tests
 - Every event produces a balanced journal entry; trial balance always balances.

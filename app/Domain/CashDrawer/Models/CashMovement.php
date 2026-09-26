@@ -3,6 +3,7 @@
 namespace App\Domain\CashDrawer\Models;
 
 use App\Domain\CashDrawer\Enums\CashMovementType;
+use App\Domain\Inventory\Support\StockReference;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -20,11 +21,13 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property CashMovementType $type
  * @property string $amount
  * @property string $reason
+ * @property string|null $reference_type
+ * @property int|null $reference_id
  * @property int $user_id
  * @property Carbon $created_at
  */
-#[Fillable(['drawer_session_id', 'type', 'amount', 'reason', 'user_id'])]
-class CashMovement extends Model
+#[Fillable(['drawer_session_id', 'type', 'amount', 'reason', 'reference_type', 'reference_id', 'user_id'])]
+class CashMovement extends Model implements StockReference
 {
     use LogsActivity;
 
@@ -37,6 +40,7 @@ class CashMovement extends Model
             'drawer_session_id' => 'integer',
             'type' => CashMovementType::class,
             'amount' => 'decimal:2',
+            'reference_id' => 'integer',
             'user_id' => 'integer',
         ];
     }
@@ -44,6 +48,16 @@ class CashMovement extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logOnly(['drawer_session_id', 'type', 'amount', 'reason']);
+    }
+
+    public function referenceLabel(): string
+    {
+        return $this->type->label();
+    }
+
+    public function referenceUrl(): ?string
+    {
+        return route('pos.drawer.report', $this->drawer_session_id);
     }
 
     /**

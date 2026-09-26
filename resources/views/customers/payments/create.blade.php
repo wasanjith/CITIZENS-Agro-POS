@@ -37,6 +37,11 @@
                     <div x-show="method !== 'cash'" x-cloak>
                         <x-ui.input name="reference" label="Reference" hint="Slip, transfer or cheque number." />
                     </div>
+                    <div x-show="method === 'cheque'" x-cloak class="grid gap-4 sm:col-span-3 sm:grid-cols-3">
+                        <x-ui.input name="cheque_bank" label="Cheque bank" maxlength="100" />
+                        <x-ui.input name="cheque_branch" label="Branch" maxlength="100" />
+                        <x-ui.date-input name="cheque_date" label="Cheque date" :value="old('cheque_date', today()->toDateString())" hint="A later date makes it a post-dated cheque." />
+                    </div>
                     <x-ui.input name="note" label="Note" class="sm:col-span-3" maxlength="255" />
                 </div>
 

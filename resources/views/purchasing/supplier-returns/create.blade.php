@@ -7,7 +7,7 @@
 @section('content')
     <x-ui.page-header
         title="Return goods to supplier"
-        :description="$receipt ? 'From '.$receipt->number.' · '.$receipt->supplier->name : 'Stock leaves the chosen batches and the supplier balance goes down by their cost.'"
+        :description="$receipt ? 'From '.$receipt->number.' · '.$receipt->supplier->name : 'Stock leaves the chosen batches and the supplier balance goes down by the buying price.'"
     />
 
     @if ($errors->any())

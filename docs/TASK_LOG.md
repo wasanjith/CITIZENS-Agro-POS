@@ -9,12 +9,12 @@
 
 | Item | Status |
 |---|---|
-| **Current phase** | Phase 4: Customers, Credit, Returns, Quotations (built; waiting for the real customer list and a credit / return run in the shop) |
+| **Current phase** | Phase 5: Finance & Banking (built; waiting for the real bank accounts and opening balances) |
 | **Last updated** | 2026-09-25 |
-| **Tests** | 310 Pest tests, all passing (Meilisearch was running, so none skipped). |
+| **Tests** | 374 Pest tests, all passing (Meilisearch was running, so none skipped). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
-| **Next** | Owner: try a credit sale with one of the 8 dummy customers (credit bill → sign → seal), a customer payment and a return; later replace the dummy customers with the real credit list → the Phase 2/3 checks still pending (product import, real PO/GRN, printers) → Phase 5 (Finance) |
+| **Next** | Owner: add the shop's bank accounts with their opening balances (Finance → Banking), then enter bank movements yourself (Move money, cheque deposits), and try an expense, a supplier payment and a customer cheque (deposit → cleared). Earlier checks still pending (product import, real PO/GRN, printers, real customer list) → Phase 6 (HR & Payroll) |
 
 ### Phase progress
 
@@ -25,7 +25,7 @@
 | 2 | Inventory + Purchasing | 🟡 Built · opening stock check + real PO/GRN run pending |
 | 3 | POS core: counter invoices, settlement, Live Billing, handover | 🟡 Built · real printers, drawer and Reverb test pending |
 | 4 | Customers, Credit, Returns, Quotations | 🟡 Built · real customer list + in-shop credit/return run pending |
-| 5 | Finance & Banking | ⚪ Not started |
+| 5 | Finance & Banking | 🟡 Built · real bank accounts + opening balances pending |
 | 6 | HR, Attendance, Payroll | ⚪ Not started |
 | 7 | Reports, Dashboard, Go-live | ⚪ Not started |
 
@@ -76,12 +76,41 @@
 | 2026-09-25 | **Credit bill:** when the cashier settles a credit sale, a "ණය බිල්පත / Credit bill" (shop copy) prints on the main printer with the customer's details, items, total, due date and account balance, and space for the customer's signature, the owner's signature and the shop seal. The shop keeps it. Reprints are marked COPY. |
 | 2026-09-25 | Returns: cash or credit to account, confirmed by the owner. |
 | 2026-09-25 | **No SMS** reminders (owner). Overdue credit is only a morning bell notification to the Owner/Manager; the SMS code and setting were removed. Dummy customers for development. |
+| 2026-09-25 | **Journal posting** happens inside the same database transaction as the sale, payment, GRN, adjustment or drawer action (called directly, not through queued listeners), so a document can never exist without its journal entry. Each document posts once per event; entries are never edited, only reversed. |
+| 2026-09-25 | **Cash places:** Cash drawer (main cashier), Safe, bank accounts, and the Owner (capital in, drawings out). Opening float comes from the safe; at closing the counted cash goes back to the safe and a shortage/excess is posted as Cash short / Cash over. Drawer "pay in" = change from the safe, "pay out" = cash the owner takes, "safe drop" = to the safe. Shop expenses go through Expenses. |
+| 2026-09-25 | Card and bank-transfer payments go to the one bank account marked for them (else a clearing account). Cheques from customers go to "Cheques in hand" and only reach the bank when marked cleared; post-dated cheques cannot be deposited early. A bounced cheque makes the customer owe it again (the invoices it paid are unpaid again); a walk-in customer's bounced cheque goes to "Dishonoured cheques". |
+| 2026-09-25 | Banks, cheques, the journal, the chart of accounts and financial reports are **Super Admin only** (never delegated). The Manager records petty-cash expenses from the drawer; only the owner pays from the safe or a bank, cancels expenses and pays suppliers. |
+| 2026-09-25 | Supplier payments are applied to goods receipts oldest first (or as chosen); extra stays as an advance. A cancelled or bounced supplier cheque makes those receipts unpaid again. |
+| 2026-09-25 | **Owner:** returns to a supplier go back at the **buying price** (the goods receipt price, net of its discount; else the supplier's last price), not the average stock cost. The difference to the stock cost is a stock gain / loss. |
+| 2026-09-25 | **Owner:** the owner enters the opening bank balances and every bank movement (deposits, transfers, cheque deposits). Card and bank-transfer payments wait under "Card & transfer payments" until moved into a bank (automatic posting can still be switched on per bank account). |
+| 2026-09-25 | **Owner:** the counted cash goes home at closing and the next day starts with the cashier's morning float brought from it. The "safe" account is shown as **Cash at home (day's takings)**. |
 
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-09-25: Owner's answers on Phase 5
+- **Supplier returns at the buying price:** each line now uses what the shop paid the supplier (the goods receipt line the batch came from, else this product's line on the chosen goods receipt, net of that receipt's discount; else the supplier's last price). The supplier's balance goes down by that amount; the stock leaves at its stock cost and the difference is posted as a stock gain or loss. The return page shows "Buying price".
+- **Bank balances entered by the owner:** new bank accounts no longer take card payments automatically (the option is off by default and explained on the form). Card and transfer money waits under "Card & transfer payments"; the Banking page says how much and links to **Move money**, which now has "Card & transfer payments (not yet in a bank)" as a source.
+- **Cash goes home:** the "safe" is now called **Cash at home (day's takings)** everywhere (Banking, Move money, expenses, supplier payments, cash book); the drawer page explains pay in / pay out / safe drop that way. How it works did not change: the morning float comes from it and the counted cash returns to it at closing. Renamed on this PC's `citizensDB` too.
+- **Tests:** 374, all passing (new: return at the goods receipt price with the stock gain, return at the supplier's last price, card money moved into the bank by hand). Larastan 0 errors, Pint clean.
+
+### 2026-09-25: Phase 5 built (Finance & Banking)
+- **Tables:** accounts (chart of accounts), journal_entries + journal_lines, bank_accounts, bank_transactions, bank_reconciliations, cheques, expense_categories, expenses, supplier_payments (+ allocations); goods receipts got `amount_paid`, cash movements a link to the document that took the cash, customer payments `reversed_at`. New numbers: `JE-` (journal), `EXP-` (expenses), `SP-` (supplier payments).
+- **Journal:** `JournalService` refuses any entry whose debits and credits differ and never edits an entry (reversals only). `FinancePosting` holds the posting rules of the plan (section 14) and is called by the existing actions: settlement (cash / card / cheque / credit), void of a settled sale (reversal), returns (restocked and damaged), customer payments, customer and supplier opening balances, GRNs, supplier returns, stock adjustments, stocktakes, opening stock, drawer open / close (variance) and pay in / pay out / safe drop. 28 system accounts are created automatically; each bank account gets its own 15xx account and each expense head a 6xxx account.
+- **Banking** (menu → Finance → Banking): balances of every bank, the safe, the drawer and cheques in hand; add/edit bank accounts with an opening balance; bank book per account with a date range and running balance; bank charges and interest; **Move money** (safe / drawer → bank, bank → safe, bank → bank, owner in / out); **reconciliation** (tick lines on the statement, live difference, history).
+- **Cheques:** received cheques are created by settlement or a customer payment (the payment form now asks for the cheque's bank, branch and date); issued cheques by supplier payments. Register (received / issued, status filter), **post-dated cheque calendar**, cheque page with deposit → cleared / bounced / cancelled and its history. Morning bell at 07:10 for cheques ready to deposit and issued cheques due within 3 days (Settings → Finance).
+- **Expenses:** with a photo or PDF of the bill; paid from the drawer (petty cash, Manager too), the safe or a bank (owner); cancel reverses it and puts the money back; 11 expense heads seeded (rent, electricity, transport …), more can be added.
+- **Supplier payments** (Purchasing → Supplier payments, "Pay supplier" on the supplier page): cash from the drawer or safe, bank transfer or cheque, applied to goods receipts oldest first or as chosen.
+- **Reports:** profit & loss, balance sheet, trial balance, cash book (safe / drawer), journal, chart of accounts with balances and a ledger per account.
+- **Backfill:** `php artisan finance:backfill-journals` posts journals for documents created before Phase 5, oldest first; running it again adds nothing.
+- **Tests:** 62 new (372 total). After every finance test the books are checked: every entry balances, the trial balance balances, receivables = customer ledger, payables = supplier ledger, each bank's ledger account = its bank book. Also: cheque bounce restores the receivable and the invoices, cancelled supplier cheque makes the GRN unpaid again, post-dated deposit blocked, petty cash lowers the drawer's expected cash, the Manager cannot pay from the safe/bank or open banking/journal even while holding cashier authority, backfill gives the same trial balance.
+- **Checked in headless Chrome** (throwaway database `citizensDB_browser`, `php -S` on port 8123): sign-in, banking overview, move money, reconciliation difference updating live, expense form showing the bank only for bank payments, supplier payment page, reports and journal. No JavaScript errors. The dev database was not touched by the check.
+- **This PC's `citizensDB`:** migrated, chart of accounts and expense heads seeded, and the backfill posted the 5 dummy customers' opening balances. No demo bank accounts were added (`DevelopmentFinanceSeeder` adds two on `migrate:fresh --seed`).
+- **Set up on another PC:** `php artisan migrate`, `php artisan db:seed --class=DocumentSequenceSeeder`, `php artisan db:seed --class=ChartOfAccountsSeeder`, `php artisan finance:backfill-journals`, `npm run build`. The scheduler must run for the 07:10 cheque reminder.
+- **Noticed (not changed):** a return to a supplier of a product without batch tracking is valued at the moving-average cost of the general stock batch, not at the price on the GRN, so the supplier's balance goes down by that average (Phase 2 behaviour). Tell me if returns should use the GRN price instead.
 
 ### 2026-09-25: Owner's answers on Phase 4: credit bill, dummy customers, no SMS
 - **Credit bill:** settling a credit sale at the main cashier now also prints a credit bill (`print/credit-bill.blade.php`) on the main printer: customer name (Sinhala), code, phone, NIC, address, items, total, due date, credit days, total owed on the account, the promise to pay, and lines for the customer's signature and the owner's signature plus a box for the shop seal. The cashier screen says "get the customer's signature and stamp the shop seal". A retried settlement does not print it twice. Invoice page: "Credit bill" (view) and "Reprint credit bill" (COPY, main terminal).

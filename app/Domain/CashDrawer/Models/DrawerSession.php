@@ -6,6 +6,7 @@ use App\Domain\CashDrawer\Enums\DrawerCloseReason;
 use App\Domain\CashDrawer\Policies\DrawerSessionPolicy;
 use App\Domain\Identity\Models\Delegation;
 use App\Domain\Identity\Models\Terminal;
+use App\Domain\Inventory\Support\StockReference;
 use App\Domain\Sales\Models\Payment;
 use App\Domain\Sales\Models\Sale;
 use App\Models\User;
@@ -44,7 +45,7 @@ use Spatie\Activitylog\Support\LogOptions;
  */
 #[Fillable(['terminal_id', 'holder_user_id', 'opened_at', 'opening_float', 'opening_denominations', 'previous_session_id', 'is_open'])]
 #[UsePolicy(DrawerSessionPolicy::class)]
-class DrawerSession extends Model
+class DrawerSession extends Model implements StockReference
 {
     use LogsActivity;
 
@@ -77,6 +78,16 @@ class DrawerSession extends Model
             ->logOnly(['holder_user_id', 'opening_float', 'closed_at', 'expected_cash', 'counted_cash', 'variance', 'close_reason'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
+    }
+
+    public function referenceLabel(): string
+    {
+        return "Drawer session #{$this->id}";
+    }
+
+    public function referenceUrl(): ?string
+    {
+        return route('pos.drawer.report', $this);
     }
 
     /**

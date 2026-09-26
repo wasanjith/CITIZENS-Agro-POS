@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Purchasing;
 
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Purchasing\Models\Supplier;
 use App\Http\Controllers\Concerns\HasListQuery;
 use App\Http\Controllers\Controller;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -59,11 +61,16 @@ class SupplierController extends Controller
         return view('purchasing.suppliers.form', ['supplier' => new Supplier(['is_active' => true, 'payment_terms_days' => 30, 'opening_balance' => '0.00'])]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, FinancePosting $finance): RedirectResponse
     {
         $this->authorize('create', Supplier::class);
 
-        $supplier = Supplier::create($this->validated($request));
+        $supplier = DB::transaction(function () use ($request, $finance): Supplier {
+            $supplier = Supplier::create($this->validated($request));
+            $finance->supplierOpening($supplier, $request->user()->id);
+
+            return $supplier;
+        });
 
         return redirect()->route('purchasing.suppliers.show', $supplier)->with('success', "Supplier {$supplier->name} created.");
     }
@@ -75,11 +82,17 @@ class SupplierController extends Controller
         return view('purchasing.suppliers.form', ['supplier' => $supplier]);
     }
 
-    public function update(Request $request, Supplier $supplier): RedirectResponse
+    public function update(Request $request, Supplier $supplier, FinancePosting $finance): RedirectResponse
     {
         $this->authorize('update', $supplier);
 
-        $supplier->update($this->validated($request, $supplier));
+        DB::transaction(function () use ($request, $supplier, $finance): void {
+            $supplier->update($this->validated($request, $supplier));
+
+            if ($supplier->wasChanged('opening_balance')) {
+                $finance->supplierOpening($supplier, $request->user()->id);
+            }
+        });
 
         return redirect()->route('purchasing.suppliers.show', $supplier)->with('success', "Supplier {$supplier->name} updated.");
     }

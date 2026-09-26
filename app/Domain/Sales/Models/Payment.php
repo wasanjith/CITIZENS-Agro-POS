@@ -3,6 +3,8 @@
 namespace App\Domain\Sales\Models;
 
 use App\Domain\CashDrawer\Models\DrawerSession;
+use App\Domain\Finance\Models\BankAccount;
+use App\Domain\Finance\Models\Cheque;
 use App\Domain\Sales\Enums\PaymentMethod;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -20,6 +22,8 @@ use Illuminate\Support\Carbon;
  * @property string $amount
  * @property string|null $tendered
  * @property string|null $reference
+ * @property int|null $cheque_id
+ * @property int|null $bank_account_id
  * @property int $recorded_by
  * @property int $confirmed_by
  * @property int $drawer_session_id
@@ -38,6 +42,8 @@ class Payment extends Model
             'method' => PaymentMethod::class,
             'amount' => 'decimal:2',
             'tendered' => 'decimal:2',
+            'cheque_id' => 'integer',
+            'bank_account_id' => 'integer',
             'recorded_by' => 'integer',
             'confirmed_by' => 'integer',
             'drawer_session_id' => 'integer',
@@ -50,6 +56,22 @@ class Payment extends Model
     public function sale(): BelongsTo
     {
         return $this->belongsTo(Sale::class);
+    }
+
+    /**
+     * @return BelongsTo<BankAccount, $this>
+     */
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
+    /**
+     * @return BelongsTo<Cheque, $this>
+     */
+    public function cheque(): BelongsTo
+    {
+        return $this->belongsTo(Cheque::class);
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Domain\Customers\Actions;
 use App\Domain\Customers\Enums\CustomerLedgerType;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Customers\Services\CustomerLedger;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Sales\Support\Money;
 use App\Domain\System\Services\DocumentNumber;
 use App\Models\User;
@@ -19,6 +20,7 @@ class SaveCustomerAction
     public function __construct(
         private readonly DocumentNumber $numbers,
         private readonly CustomerLedger $ledger,
+        private readonly FinancePosting $finance,
     ) {}
 
     /**
@@ -46,6 +48,7 @@ class SaveCustomerAction
 
             if ($openingBalance->isPositive()) {
                 $this->ledger->debit($customer->id, CustomerLedgerType::Opening, 'Opening balance', $openingBalance, today(), $user->id, today(), 'Balance brought forward');
+                $this->finance->customerOpening($customer, $openingBalance, $user->id);
             }
 
             // Columns filled by database defaults must exist (models are strict).

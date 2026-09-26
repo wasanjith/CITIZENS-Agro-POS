@@ -2,8 +2,16 @@
 
 namespace App\Providers;
 
+use App\Domain\CashDrawer\Models\CashMovement;
+use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\Catalog\Models\OpeningStockEntry;
+use App\Domain\Customers\Models\Customer;
 use App\Domain\Customers\Models\CustomerPayment;
+use App\Domain\Finance\Models\BankAccount;
+use App\Domain\Finance\Models\BankTransaction;
+use App\Domain\Finance\Models\Cheque;
+use App\Domain\Finance\Models\Expense;
+use App\Domain\Finance\Models\JournalEntry;
 use App\Domain\Identity\Services\CashierAuthority;
 use App\Domain\Identity\Services\DelegationService;
 use App\Domain\Identity\Support\CurrentTerminal;
@@ -11,6 +19,8 @@ use App\Domain\Inventory\Models\StockAdjustment;
 use App\Domain\Inventory\Models\Stocktake;
 use App\Domain\Purchasing\Models\GoodsReceipt;
 use App\Domain\Purchasing\Models\PurchaseOrder;
+use App\Domain\Purchasing\Models\Supplier;
+use App\Domain\Purchasing\Models\SupplierPayment;
 use App\Domain\Purchasing\Models\SupplierReturn;
 use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Models\SaleReturn;
@@ -52,6 +62,16 @@ class AppServiceProvider extends ServiceProvider
             'sale' => Sale::class,
             'sale_return' => SaleReturn::class,
             'customer_payment' => CustomerPayment::class,
+            'customer' => Customer::class,
+            'supplier' => Supplier::class,
+            'supplier_payment' => SupplierPayment::class,
+            'drawer_session' => DrawerSession::class,
+            'cash_movement' => CashMovement::class,
+            'bank_account' => BankAccount::class,
+            'bank_transaction' => BankTransaction::class,
+            'cheque' => Cheque::class,
+            'expense' => Expense::class,
+            'journal_entry' => JournalEntry::class,
         ]);
 
         $this->registerGates();

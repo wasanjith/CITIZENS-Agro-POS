@@ -148,6 +148,10 @@ return [
             'quotation_valid_days' => 7,
             'overdue_alert' => true,
         ],
+        'finance' => [
+            'cheque_alert' => true,
+            'cheque_alert_days' => 3,
+        ],
     ],
 
 ];

@@ -6,6 +6,7 @@ use App\Domain\CashDrawer\Enums\CashMovementType;
 use App\Domain\CashDrawer\Models\CashMovement;
 use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\CashDrawer\Services\DrawerCalculator;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Sales\Support\Money;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,10 @@ use Illuminate\Validation\ValidationException;
  */
 class RecordCashMovementAction
 {
-    public function __construct(private readonly DrawerCalculator $calculator) {}
+    public function __construct(
+        private readonly DrawerCalculator $calculator,
+        private readonly FinancePosting $finance,
+    ) {}
 
     public function handle(DrawerSession $session, User $user, CashMovementType $type, string $amount, string $reason): CashMovement
     {
@@ -37,13 +41,17 @@ class RecordCashMovementAction
                 throw ValidationException::withMessages(['amount' => 'The drawer does not hold that much cash (expected Rs. '.Money::format($this->calculator->expectedCash($session)).').']);
             }
 
-            return CashMovement::create([
+            $movement = CashMovement::create([
                 'drawer_session_id' => $session->id,
                 'type' => $type,
                 'amount' => (string) $value,
                 'reason' => mb_substr($reason, 0, 255),
                 'user_id' => $user->id,
             ]);
+
+            $this->finance->cashMovement($movement, $user->id);
+
+            return $movement;
         });
     }
 }

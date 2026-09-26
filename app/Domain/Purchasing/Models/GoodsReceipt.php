@@ -6,6 +6,7 @@ use App\Domain\Inventory\Support\StockReference;
 use App\Domain\Purchasing\Enums\GoodsReceiptStatus;
 use App\Domain\Purchasing\Policies\GoodsReceiptPolicy;
 use App\Models\User;
+use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string|null $supplier_invoice_no
  * @property Carbon $received_at
  * @property string $subtotal
+ * @property string $amount_paid
  * @property string $discount
  * @property string $tax
  * @property string $total
@@ -57,6 +59,7 @@ class GoodsReceipt extends Model implements StockReference
             'discount' => 'decimal:2',
             'tax' => 'decimal:2',
             'total' => 'decimal:2',
+            'amount_paid' => 'decimal:2',
             'status' => GoodsReceiptStatus::class,
             'received_by' => 'integer',
             'posted_at' => 'datetime',
@@ -69,6 +72,14 @@ class GoodsReceipt extends Model implements StockReference
             ->logOnly(['number', 'supplier_id', 'purchase_order_id', 'supplier_invoice_no', 'status', 'total'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
+    }
+
+    /**
+     * What is still to be paid on this receipt.
+     */
+    public function outstanding(): BigDecimal
+    {
+        return BigDecimal::of($this->total)->minus($this->amount_paid)->toScale(2);
     }
 
     public function referenceLabel(): string

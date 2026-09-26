@@ -5,6 +5,7 @@ namespace App\Domain\CashDrawer\Actions;
 use App\Domain\CashDrawer\Enums\DrawerCloseReason;
 use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\CashDrawer\Services\DrawerCalculator;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Identity\Models\Terminal;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -19,7 +20,10 @@ use Illuminate\Validation\ValidationException;
  */
 class OpenDrawerAction
 {
-    public function __construct(private readonly DrawerCalculator $calculator) {}
+    public function __construct(
+        private readonly DrawerCalculator $calculator,
+        private readonly FinancePosting $finance,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $denominations
@@ -40,7 +44,7 @@ class OpenDrawerAction
 
                 $previous ??= $this->waitingHandover($terminal);
 
-                return DrawerSession::create([
+                $session = DrawerSession::create([
                     'terminal_id' => $terminal->id,
                     'holder_user_id' => $holder->id,
                     'opened_at' => now(),
@@ -49,6 +53,10 @@ class OpenDrawerAction
                     'previous_session_id' => $previous?->id,
                     'is_open' => true,
                 ]);
+
+                $this->finance->drawerOpened($session, $holder->id);
+
+                return $session;
             });
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['drawer' => 'A drawer session is already open on this terminal.']);

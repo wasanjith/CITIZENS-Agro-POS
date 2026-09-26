@@ -8,6 +8,7 @@ use App\Domain\Customers\Models\Customer;
 use App\Domain\Customers\Models\CustomerPayment;
 use App\Domain\Customers\Models\CustomerPaymentAllocation;
 use App\Domain\Customers\Services\CustomerLedger;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Sales\Enums\PaymentMethod;
 use App\Domain\Sales\Enums\PrintDocumentType;
@@ -35,12 +36,13 @@ class ReceiveCustomerPaymentAction
     public function __construct(
         private readonly DocumentNumber $numbers,
         private readonly CustomerLedger $ledger,
+        private readonly FinancePosting $finance,
     ) {}
 
     /**
      * allocations: sale_id => amount chosen by the cashier; null or empty = oldest first.
      *
-     * @param  array{amount: string, method: string, reference?: string|null, note?: string|null, allocations?: array<int|string, string|null>|null}  $data
+     * @param  array{amount: string, method: string, reference?: string|null, note?: string|null, allocations?: array<int|string, string|null>|null, cheque_bank?: string|null, cheque_branch?: string|null, cheque_date?: string|null}  $data
      * @return array{payment: CustomerPayment, print_job: PrintJob|null, created: bool}
      */
     public function handle(Customer $customer, User $cashier, Terminal $terminal, DrawerSession $session, array $data, string $idempotencyKey): array
@@ -102,6 +104,11 @@ class ReceiveCustomerPaymentAction
                 }
 
                 $this->ledger->credit($customer->id, CustomerLedgerType::Payment, $payment, $amount, today(), $cashier->id, $method->label().($reference !== null ? " {$reference}" : ''));
+                $this->finance->customerPaymentReceived($payment, [
+                    'bank_name' => $data['cheque_bank'] ?? null,
+                    'branch' => $data['cheque_branch'] ?? null,
+                    'cheque_date' => $data['cheque_date'] ?? null,
+                ], $cashier->id);
 
                 return [$payment, PrintJob::record(PrintDocumentType::PaymentReceipt, $payment->id, $terminal->loadMissing('printer'), $cashier->id)];
             });

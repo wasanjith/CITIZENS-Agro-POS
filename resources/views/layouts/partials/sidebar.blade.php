@@ -38,6 +38,16 @@
             ['label' => 'Goods received', 'route' => 'purchasing.goods-receipts.index', 'active' => 'purchasing.goods-receipts.*', 'can' => 'purchasing.grn.create'],
             ['label' => 'Supplier returns', 'route' => 'purchasing.supplier-returns.index', 'active' => 'purchasing.supplier-returns.*', 'can' => 'purchasing.grn.create'],
             ['label' => 'Suppliers', 'route' => 'purchasing.suppliers.index', 'active' => 'purchasing.suppliers.*', 'can' => 'purchasing.suppliers.manage'],
+            ['label' => 'Supplier payments', 'route' => 'purchasing.supplier-payments.index', 'active' => 'purchasing.supplier-payments.*', 'can' => ['purchasing.suppliers.pay', 'purchasing.suppliers.manage']],
+        ],
+        'Finance' => [
+            ['label' => 'Banking', 'route' => 'finance.bank-accounts.index', 'active' => ['finance.bank-accounts.*', 'finance.money.*'], 'can' => 'finance.banks.manage'],
+            ['label' => 'Cheques', 'route' => 'finance.cheques.index', 'active' => ['finance.cheques.index', 'finance.cheques.show'], 'can' => 'finance.cheques.manage'],
+            ['label' => 'Cheque calendar', 'route' => 'finance.cheques.calendar', 'active' => 'finance.cheques.calendar', 'can' => 'finance.cheques.manage'],
+            ['label' => 'Expenses', 'route' => 'finance.expenses.index', 'active' => ['finance.expenses.*', 'finance.expense-categories.*'], 'can' => 'finance.expenses.manage'],
+            ['label' => 'Journal', 'route' => 'finance.journal.index', 'active' => 'finance.journal.*', 'can' => 'finance.journal.view'],
+            ['label' => 'Chart of accounts', 'route' => 'finance.accounts.index', 'active' => 'finance.accounts.*', 'can' => 'finance.journal.view'],
+            ['label' => 'Financial reports', 'route' => 'finance.reports.profit-loss', 'active' => 'finance.reports.*', 'can' => 'reports.finance'],
         ],
         'Administration' => [
             ['label' => 'Users', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'admin.users.manage'],

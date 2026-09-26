@@ -6,6 +6,7 @@ use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Customers\Enums\CustomerLedgerType;
 use App\Domain\Customers\Services\CustomerLedger;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Identity\Models\Terminal;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\Batch;
@@ -48,6 +49,7 @@ class CreateSaleReturnAction
         private readonly ReturnableItems $returnable,
         private readonly DocumentNumber $numbers,
         private readonly CustomerLedger $ledger,
+        private readonly FinancePosting $finance,
     ) {}
 
     /**
@@ -178,6 +180,7 @@ class CreateSaleReturnAction
         $return->forceFill(['total' => (string) $total, 'cost_total' => (string) $costTotal])->save();
 
         $this->refund($sale, $return, $method, $total, $cashier, $session);
+        $this->finance->saleReturned($return, $cashier->id);
 
         $fullyReturned = collect($rows)->every(function (array $row) use ($lines): bool {
             $now = isset($lines[$row['item']->id]) ? $lines[$row['item']->id]['base_qty'] : Qty::of('0');

@@ -3,6 +3,7 @@
 namespace App\Domain\Inventory\Actions;
 
 use App\Domain\Catalog\Models\OpeningStockEntry;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Services\StockService;
 use App\Models\User;
@@ -16,7 +17,10 @@ use Illuminate\Support\Facades\DB;
  */
 class PostOpeningStockAction
 {
-    public function __construct(private readonly StockService $stock) {}
+    public function __construct(
+        private readonly StockService $stock,
+        private readonly FinancePosting $finance,
+    ) {}
 
     /**
      * @param  list<int>|null  $entryIds  null = every unposted entry
@@ -51,6 +55,7 @@ class PostOpeningStockAction
 
                 $entry->posted_at = now();
                 $entry->save();
+                $this->finance->openingStockPosted($entry, $actor?->id);
                 $posted++;
             }
 

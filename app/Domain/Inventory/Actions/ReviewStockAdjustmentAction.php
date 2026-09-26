@@ -2,6 +2,7 @@
 
 namespace App\Domain\Inventory\Actions;
 
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Inventory\Enums\AdjustmentStatus;
 use App\Domain\Inventory\Models\StockAdjustment;
 use App\Domain\Inventory\Services\StockService;
@@ -15,7 +16,10 @@ use Illuminate\Validation\ValidationException;
  */
 class ReviewStockAdjustmentAction
 {
-    public function __construct(private readonly StockService $stock) {}
+    public function __construct(
+        private readonly StockService $stock,
+        private readonly FinancePosting $finance,
+    ) {}
 
     public function approve(StockAdjustment $adjustment, User $actor): StockAdjustment
     {
@@ -42,6 +46,8 @@ class ReviewStockAdjustmentAction
             $adjustment->approved_by = $actor->id;
             $adjustment->approved_at = now();
             $adjustment->save();
+
+            $this->finance->stockCorrected($adjustment, $actor->id);
 
             return $adjustment;
         });

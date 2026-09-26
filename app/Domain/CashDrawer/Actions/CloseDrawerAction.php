@@ -5,6 +5,7 @@ namespace App\Domain\CashDrawer\Actions;
 use App\Domain\CashDrawer\Enums\DrawerCloseReason;
 use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\CashDrawer\Services\DrawerCalculator;
+use App\Domain\Finance\Services\FinancePosting;
 use App\Domain\Sales\Enums\SaleStatus;
 use App\Domain\Sales\Models\Sale;
 use App\Models\User;
@@ -19,7 +20,10 @@ use Illuminate\Validation\ValidationException;
  */
 class CloseDrawerAction
 {
-    public function __construct(private readonly DrawerCalculator $calculator) {}
+    public function __construct(
+        private readonly DrawerCalculator $calculator,
+        private readonly FinancePosting $finance,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $denominations
@@ -57,6 +61,8 @@ class CloseDrawerAction
                 'close_note' => $note !== null ? mb_substr($note, 0, 255) : null,
                 'is_open' => null,
             ])->save();
+
+            $this->finance->drawerClosed($session, $closedBy->id);
 
             return $session;
         });

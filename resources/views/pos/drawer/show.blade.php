@@ -60,6 +60,7 @@
                             <x-ui.select name="type" label="Type" :options="$movementTypes" required />
                             <x-ui.money-input name="amount" label="Amount" required />
                             <x-ui.input name="reason" label="Reason" required maxlength="255" class="sm:col-span-2" />
+                            <p class="text-xs text-gray-500 sm:col-span-4">Pay in = change brought from home. Pay out = cash the owner takes for personal use. Safe drop = cash sent home during the day. At closing the counted cash goes home. Shop expenses go through <a href="{{ route('finance.expenses.create') }}" class="text-brand-700 hover:underline">Expenses</a> (petty cash).</p>
                             <div class="sm:col-span-4 flex justify-end"><x-ui.button type="submit">Record</x-ui.button></div>
                         </form>
                     @endif
