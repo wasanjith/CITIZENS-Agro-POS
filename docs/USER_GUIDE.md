@@ -15,7 +15,7 @@
 6. [Catalog: adding products](#6-catalog-adding-products)
 7. [Inventory: how stock gets in and out](#7-inventory-how-stock-gets-in-and-out)
 8. [Purchasing: order → receive → pay](#8-purchasing-order--receive--pay)
-9. [POS: a normal day at the shop](#9-pos-a-normal-day-at-the-shop)Jelly-raw
+9. [POS: a normal day at the shop](#9-pos-a-normal-day-at-the-shop)
 10. [Customers, credit, returns and quotations](#10-customers-credit-returns-and-quotations)
 11. [Finance and banking](#11-finance-and-banking)
 12. [HR, attendance and payroll](#12-hr-attendance-and-payroll)
@@ -169,21 +169,24 @@ The form has five tabs. A red dot on a tab means an error on it.
 | SKU / supplier code | Optional. |
 | Name (English) * | |
 | Category *, Brand | |
-| **Base unit** * | The unit stock is counted in (kg, piece, litre). **All stock is stored in this unit.** |
+| **Base unit** * | The unit stock is counted in. **All stock is stored in this unit.** Sealed goods: packet, bag, bottle, piece. Loose goods: kg. |
 | Tax | Leave empty unless VAT applies. |
+| **Sold loose (weighed out)** | Tick for fertilizer weighed at the counter. It gets two prices (section 6.5). Leave it off for sealed packets and bags. |
+| **Can be opened into** + **Loose quantity in one pack** | Only on a sealed bag that is sometimes opened and sold loose, e.g. *Urea 50kg bag* → *Urea (loose)*, 50 (kg). See section 7.7. |
 | Description, Active | Inactive products don't show at the POS. |
 
 **2. Units & Prices**
 
-- Add **other units** with *Base units per unit*. Example: base unit **kg**, add **bag = 50** → one bag is 50 kg of stock.
+- Add **other units** with *Base units per unit* only when the product really is bought or sold in a bigger unit (e.g. loose urea bought as **bag = 50** kg). A different pack size is a **separate product**, not a unit (section 6.5).
 - Choose the **default sale unit** (picked first at the counter) and the **default purchase unit** (picked first on POs).
-- Enter prices per **price list** (Retail, Wholesale, Farmer-credit) per unit.
-- **Reference cost** (cost of one base unit) and **minimum margin %**: the form warns when a price is below the margin. After the first goods receipt, reference cost follows the latest GRN automatically.
+- Enter prices per **price list** (Retail, Wholesale, Farmer-credit). Every box is optional: **leave it empty for no price**. Clearing a price removes it (it stays in the history as *Removed*).
+- For a **loose** product the base unit has two rows: **Under 1 kg (price per kg)** and **1 kg and above (price per kg)**. Under each box the form shows the same price per 100 g.
+- **Reference cost** (cost of one base unit) and **minimum margin %**: the form warns when a price is below the margin, and refuses to save it. After the first goods receipt, reference cost follows the latest GRN automatically.
 - Every price change is kept in the product's **price history** and the audit log.
 
-**3. Variants** (bicycle parts in sizes/colours)
+**3. Variants** (bicycle parts in colours)
 
-- A parent product with variants, each with its own code and stock. Variants share the product's prices.
+- A parent product with variants, each with its own code and stock. **Variants share the product's prices.** When sizes have different prices (Tyre 26" and 28"), make them separate products instead.
 
 **4. Search & Names**
 
@@ -206,40 +209,81 @@ The form has five tabs. A red dot on a tab means an error on it.
 
 **Catalog → Products → Import from Excel**
 
-1. **Download template.**
-2. Fill one row per product:
+1. **Download template.** The owner's own price sheet (*Product Name, Sinhala Name, Product Varients, Selling Price, Whole Sale Price, Price for Kg's, Price for grams …*) can also be uploaded as it is.
+2. Fill one row per product (one row per **pack size**):
 
 | Column | Required | Meaning |
 |---|:-:|---|
-| `short_code` | | Empty = next free code of the category |
-| `name` | ✅ | English name |
-| `name_si`, `name_ta` | | Sinhala / Tamil names |
-| `aliases` | | Comma-separated: `yuriya, u50` |
-| `category` | ✅ | Existing category, or `Parent > Child` |
-| `brand` | | Created if new |
-| `base_unit` | ✅ | kg, piece, litre… |
-| `sale_units` | | `bag=50; packet=5` |
-| `default_sale_unit` | | Empty = base unit |
-| `retail_price`, `wholesale_price` | | Price of the **default sale unit**; other units get the proportional price |
-| `reorder_level`, `reorder_qty` | | In base units |
-| **`opening_stock`** | | **Stock on hand now, in base units** |
-| **`cost`** | | **Cost of one base unit** |
-| `batch_no`, `expiry_date` | | Lot and expiry (`YYYY-MM-DD`) of the opening stock |
+| Short Code | | Empty = next free code of the category |
+| Product Name | ✅ | English name. **Leave it empty on the next rows of the same product** to add more pack sizes |
+| Sinhala Name, Tamil Name | | |
+| Aliases | | Comma-separated: `yuriya, u50` |
+| Category | ✅ | Existing category, or `Parent > Child` |
+| Brand | | Created if new |
+| Base Unit | ✅ | packet, bag, bottle, piece for sealed goods; kg for loose goods. `grams`, `kgs`, `pcs` … are understood too |
+| **Pack Size** (*Product Varients*) | | `10g packet`, `50kg bag` … Each pack size becomes its **own product**: Okra + 10g packet → *Okra 10g packet* |
+| Default Sale Unit | | Empty = base unit |
+| **Opening Stock** | | **Stock on hand now, in the base unit** (packets, bags, kg) |
+| **Cost** | | **Cost of one base unit** (one packet, one kg) |
+| Whole Sale Price | | For wholesale customers. Empty = they pay the selling price |
+| Selling Price | | Price of the default sale unit. Empty = imported, but can't be billed until a price is set |
+| **Price for Kg's (per kg)** | | Loose goods: price per kg from 1 kg |
+| **Price for grams (per kg)** | | Loose goods: price per kg under 1 kg. **Write it per kg**: Rs. 30 for 100 g is **300** |
+| Reorder Level, Reorder Qty | | In the base unit |
+| Other Units | | `bag=50` when it is bought in a bigger unit. No price is worked out for it |
+| Batch No, Expiry Date | | Lot and expiry (`YYYY-MM-DD`) of the opening stock |
+| Opens Into, Loose Qty Per Pack | | Sealed bag that is sometimes opened: the loose product's name or code, and the kg in one bag (empty = read from the pack size, `50kg bag` → 50) |
 
-3. **Upload** → the system checks every row and shows a **preview** with errors per row.
+   Example (seed packets: the name once, then one row per size):
+
+   | Product Name | Base Unit | Pack Size | Cost | Selling Price | Reorder Level |
+   |---|---|---|--:|--:|--:|
+   | Okra | packet | 10g packet | 72 | 120 | 50 |
+   | | | 50g packet | 192 | 290 | 15 |
+   | | | 100g packet | 348 | 530 | 15 |
+
+3. **Upload** → the system checks every row and shows a **preview**: errors per row, the prices it will save, and **notes**.
+   - **Errors** stop the import (unknown unit or category, a grams price that looks like a price per 100 g, a row that is both a pack and loose …).
+   - **Notes** don't: *No Selling Price*, *Base unit g changed to packet* (a 10g pack is counted as one packet), *Same name as row 5*.
 4. Fix errors and upload again, or **Import** when clean. The import is all-or-nothing.
 5. The import **only adds** products. An existing short code is an error (edit those on the form instead).
 6. Opening stock is **added to inventory straight away** as `Opening stock` movements. If older imported entries were not yet posted, **Inventory → Stock on hand → Add opening stock now** posts them.
+7. Afterwards, open **Reports → Products without a selling price** (or tick *No selling price* on the product list) and fill in the missing prices.
 
-**Export:** Catalog → Products → *Export* downloads the whole catalog to Excel.
+**Export:** Catalog → Products → *Export* downloads the catalog in the same layout (the Cost column only for Owner and Manager).
 
 ### 6.4 How POS search finds products
 
 - Exact short code wins (`1023` adds instantly).
 - Then typo-tolerant search over name, aliases, Sinhala/Tamil names, brand, attributes and synonyms. Fast sellers rank higher.
-- `5*urea` adds 5 of the first match.
+- `5*urea` adds 5 of the first match; `750g*urea` adds 750 g of a loose product.
 - Stock shown in search is always live.
 - If the search server (Meilisearch) is down, a slower MySQL search is used automatically.
+
+### 6.5 How pricing works (packets, loose goods, wholesale)
+
+The shop sells three kinds of goods. Set each product up as one of them:
+
+| Kind | Examples | How to set it up | Prices |
+|---|---|---|---|
+| **Sealed pack** | Okra 10g packet, Okra 50g packet, Urea 50kg bag, Glyphosate 1L bottle, brake cable | **One product per pack size.** Base unit packet / bag / bottle / piece. Never opened, so a 50g packet is not "50 grams" of a 10g product. | One price per list. |
+| **Loose goods** | Urea (loose), TSP (loose) | Base unit **kg**, tick **Sold loose**. | **Under 1 kg** price per kg and **1 kg and above** price per kg. |
+| **Sealed bag that is sometimes opened** | Urea 50kg bag | A sealed product, plus **Can be opened into** = the loose product, 50 kg per bag. | Its own bag price. |
+
+**Loose prices.** The counter picks the price by the **weight of the line**:
+
+| Customer buys | Price used (example: Rs. 300/kg under 1 kg, Rs. 250/kg from 1 kg) | Line total |
+|---|---|--:|
+| 250 g | under 1 kg: 0.25 × 300 | 75.00 |
+| 999 g | under 1 kg: 0.999 × 300 | 299.70 |
+| 1 kg | from 1 kg: 1 × 250 | 250.00 |
+| 1.5 kg | from 1 kg: 1.5 × 250 | 375.00 |
+
+If only one loose price is set, it is used for every weight.
+
+**Price lists.** *Retail* is the normal price. Customers on the **Wholesale** list (the few who buy in bulk to sell again; set on the customer) pay the wholesale price **where there is one**, and the retail price for everything else. The invoice line remembers which list its price came from.
+
+**No price.** A product without a selling price can be saved and stocked, but the counter refuses it ("… has no price per packet"). Find them under **Reports → Products without a selling price**.
 
 ---
 
@@ -268,6 +312,7 @@ The form has five tabs. A red dot on a tab means an error on it.
 | Return to supplier | − | Supplier return (section 8.4) |
 | Adjustment (in / out) | ± | Stock adjustment (section 7.4) |
 | Stocktake | ± | Posting a stocktake (section 7.5) |
+| Pack opened / From opened pack | − sealed bag / + loose product | Opening sealed bags (section 7.7, or *Open now* on a GRN) |
 
 ### 7.3 Inventory pages
 
@@ -277,6 +322,7 @@ The form has five tabs. A red dot on a tab means an error on it.
 | **Expiring stock** | Batches expiring within 30 / 60 / 90 / 180 days, with a **write-off** action. |
 | **Stock movements** | The full ledger, filter by product, type or date; each line links to its document. |
 | **Adjustments** | Manual corrections (below). |
+| **Open packs** | Sealed bags opened into loose stock (section 7.7). |
 | **Stocktakes** | Physical counts (below). |
 
 The product page also shows stock by batch and recent movements.
@@ -312,6 +358,20 @@ Numbers: `STK-…`. Tip: count when the shop is closed, or don't sell the counte
 
 - **07:00 daily**: bell notification to Owner/Manager with products at or below reorder level and batches about to expire.
 - Stock badges at the POS: green (OK), amber (low), red (none).
+
+### 7.7 Opening sealed bags into loose stock (Inventory → Open packs)
+
+Loose fertilizer comes from sealed bags. Bags opened **when a delivery arrives** are entered on the GRN (*Open now*, section 8.3). When the loose stock runs out before the next delivery:
+
+1. **Inventory → Open packs → Open packs** (Owner and Manager).
+2. Choose the **sealed pack** (only bags set up with *Can be opened into* are listed; stock on hand is shown).
+3. Enter **packs to open**, and what you **weighed** into the loose stock. Leave the weight empty when the bags held their full weight.
+4. Save. In one step:
+   - the bags leave stock (`Pack opened`) and the loose product gets the weight (`From opened pack`);
+   - the bags' cost moves to the loose stock: 3 bags at Rs. 10,000 into 150 kg = Rs. 200 per kg (the loose product's reference cost);
+   - a short weight shows as a red difference (e.g. −1 kg) on the opening, so a supplier that keeps short-filling bags is easy to spot.
+
+Numbers: `OPN-…`. An opening can't be undone; correct a mistake with a stock adjustment.
 
 ---
 
@@ -362,6 +422,7 @@ Name, phone, address, credit terms. The supplier page shows balance, ledger (goo
 
    - *Add a product that was not on the order* for extra items.
    - You can't receive more than is outstanding on a PO line; put extras as free quantity or a separate line.
+   - **Open now** (only on bags set up with *Can be opened into*): how many of these bags are opened straight away for loose sale, and what they weighed. Example: 10 bags of urea arrive, 7 stay sealed, 3 are opened → *Open now 3, weighed 149.5*. All 10 count as received on the PO; posting then opens the 3 bags (section 7.7).
 4. **Save** → *Draft* (nothing has happened to stock yet; you can still edit).
 5. **Post** →
    - stock **in** (paid + free), one new batch per line for batch-tracked products;
@@ -403,7 +464,7 @@ Pay from the drawer, cash at home, a bank transfer, or a **cheque**. The payment
 |---|---|
 | **F2** | Focus search (it is always focused) |
 | ↑ ↓ **Enter** | Pick a result and add it |
-| `5*urea` | Add with quantity 5 |
+| `5*urea` | Add with quantity 5 (`750g*urea` adds 750 g of a loose product) |
 | **+ / − / Del** | Change quantity / remove line |
 | **F4** | Choose or quick-add a customer (phone, name, NIC, village) |
 | **F6** | Amount tendered |
@@ -414,7 +475,9 @@ Pay from the drawer, cash at home, a bank transfer, or a **cheque**. The payment
 | **Esc** | Clear the bill |
 
 Steps:
-1. Add items (search, favourites, recent, or category tiles). Switch the unit (bag / kg) on a line if needed.
+1. Add items (search, favourites, recent, or category tiles). Switch the unit on a line if needed.
+   - **Loose goods:** type the weight in the quantity box as kg (`1.5`) or grams (`750g`). Under 1 kg the line shows the grams, and the price column shows which price applies (*under 1 kg* or *from 1 kg*, section 6.5).
+   - Choosing a **wholesale customer** (F4) switches the bill to the Wholesale list; items without a wholesale price stay at the retail price.
 2. Discounts per line or for the bill. Above the staff limit, an **approval request** goes to the cashier; wait for approval before printing.
 3. Tell the customer the total. Choose payment: **Cash** (type tendered; the balance shows large), or Card / Bank transfer / Cheque / **Credit** (credit needs a customer).
 4. **F9**: the server re-prices every line, reserves stock, takes the next invoice number (`INV-2026-000123`) and prints the Sinhala invoice on **this counter's printer**.
@@ -518,7 +581,7 @@ Rules (Settings → HR & payroll): EPF 8 % + 12 %, ETF 3 %, OT = hours × basic 
 | Sales | Daily summary / Z report, by item, category, brand, counter, staff, customer, hour; discounts; settlement waiting time |
 | Loss prevention | Removed items & voids by counter, removed items & cleared bills, reprints, discounts above limit |
 | Profit (owner) | By item, category, day (FIFO cost) |
-| Inventory | Stock on hand & valuation, stock by batch, movement history, expiry, dead stock, reorder list, adjustment & stocktake variance |
+| Inventory | Stock on hand & valuation, stock by batch, movement history, expiry, dead stock, reorder list, **products without a selling price**, adjustment & stocktake variance |
 | Purchasing | By supplier, by item, open orders, supplier ageing |
 | Customers | Receivables ageing, credit sales |
 | Cash & finance | Drawer sessions & variances, handover history, expenses (+ P&L, balance sheet, trial balance, cash/bank book, cheque register) |
@@ -560,6 +623,7 @@ Readiness checklist plus Excel import of **credit customers and suppliers with o
 | Supplier return | `SRN-…` | Posted on save |
 | Stock adjustment | `ADJ-…` | Posted · Waiting for approval → Posted / Rejected |
 | Stocktake | `STK-…` | Open → Counting ⇄ Review → Posted · Cancelled |
+| Opened packs | `OPN-…` | Posted on save |
 | Customer | `C-00001` | Active / Inactive |
 | Customer payment | `RCP-…` | |
 | Sale return | `RET-…` | |
@@ -597,6 +661,10 @@ The server's scheduler must run (`php artisan schedule:run` every minute).
 | Can't close the drawer | An invoice is still waiting. Settle or void it first. |
 | "Not enough stock" at print | Check Stock on hand; post the GRN for the delivery, or an adjustment. Negative stock is off by default. |
 | Imported products show zero stock | Inventory → Stock on hand → **Add opening stock now**. |
+| "… has no price per packet" at the counter | The product has no selling price. Set it on the product (Units & Prices). Reports → *Products without a selling price* lists them all. |
+| Loose urea under 1 kg is billed at the 1 kg price | The product has only one loose price. Fill both rows (*Under 1 kg* and *1 kg and above*) on the product. |
+| Import says "Price for grams … Write it as a price per kg" | The grams price was written per 100 g or per gram. Write it per kg: Rs. 30 for 100 g is 300. |
+| Loose stock is zero but sealed bags are in stock | Open bags: Inventory → **Open packs**. |
 | A posted GRN is wrong | Posted GRNs can't be edited. Make a **supplier return** for the wrong quantity, then a new GRN if needed. |
 | Adjustment stuck "Waiting for approval" | Its value is above Rs. 10,000; the owner approves it from the bell or Inventory → Adjustments. |
 | Search is slow for a few seconds | The search server is down; the MySQL fallback is being used. Restart Meilisearch. |

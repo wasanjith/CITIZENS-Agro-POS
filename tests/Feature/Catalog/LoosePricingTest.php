@@ -12,6 +12,7 @@ use App\Domain\Inventory\Services\StockService;
 use App\Domain\Sales\Services\CartPricer;
 use App\Domain\Sales\Support\InvoicePresenter;
 use Database\Seeders\CatalogSeeder;
+use Database\Seeders\DevelopmentCatalogSeeder;
 use Illuminate\Validation\ValidationException;
 
 /*
@@ -306,4 +307,47 @@ test('the invoice shows grams next to an amount under 1 kg', function () {
 
     expect($sale->items()->value('line_total'))->toBe('225.00')
         ->and($html)->toContain('0.75 kg (750 g) × 300.00');
+});
+
+test('products without a selling price are listed in the report and on the product list', function () {
+    $priced = createProduct(['name' => 'Okra 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '120.00']]);
+    $never = createProduct(['name' => 'Okra 250g packet', 'category' => 'Seeds', 'base_unit' => 'packet']);
+    $wholesaleOnly = createProduct(['name' => 'Bush Bean 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Wholesale' => ['packet' => '110.00']]);
+    $removed = createProduct(['name' => 'Mas Long Bean 100g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '400.00']]);
+    app(SaveProductAction::class)->handle([
+        'prices' => [['unit_id' => unitId('packet'), 'price_list_id' => $this->retail->id, 'min_qty' => '0', 'price' => '']],
+    ], $this->owner, $removed);
+
+    expect(app(PriceBook::class)->whereWithoutPrice(Product::query(), $this->retail->id)->pluck('name')->sort()->values()->all())
+        ->toBe(['Bush Bean 10g packet', 'Mas Long Bean 100g packet', 'Okra 250g packet']);
+
+    $this->actingAs($this->owner)->get(route('reports.show', 'products-without-price'))
+        ->assertOk()
+        ->assertSee($never->name)
+        ->assertSee($wholesaleOnly->name)
+        ->assertSee($removed->name)
+        ->assertDontSee($priced->name)
+        ->assertDontSee($this->loose->name);
+
+    $this->actingAs($this->owner)->get(route('catalog.products.index', ['filter' => ['no_price' => '1']]))
+        ->assertOk()
+        ->assertSee($never->name)
+        ->assertDontSee($priced->name);
+});
+
+test('the demo catalog follows the shop pricing', function () {
+    $this->seed(DevelopmentCatalogSeeder::class);
+
+    $bag = Product::firstWhere('short_code', '1001');
+    $loose = Product::firstWhere('short_code', '1101');
+
+    expect($bag->name)->toBe('Urea 50kg bag')
+        ->and($bag->opens_into_product_id)->toBe($loose->id)
+        ->and($bag->opens_into_qty)->toBe('50.000')
+        ->and($loose->sold_loose)->toBeTrue()
+        ->and(priceOneLine($loose, 'kg', '0.5')['unit_price'])->toBe('300.00')
+        ->and(priceOneLine($loose, 'kg', '2')['unit_price'])->toBe('250.00')
+        ->and(priceOneLine($loose, 'kg', '2', $this->wholesale)['unit_price'])->toBe('240.00')
+        ->and(priceOneLine(Product::firstWhere('short_code', '2012'), 'packet', '1')['unit_price'])->toBe('290.00')
+        ->and(app(PriceBook::class)->whereWithoutPrice(Product::query(), $this->retail->id)->pluck('short_code')->all())->toBe(['2014']);
 });

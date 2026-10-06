@@ -11,7 +11,7 @@
 |---|---|
 | **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
 | **Last updated** | 2026-10-06 |
-| **Tests** | 488 Pest tests, all passing (Meilisearch was running, so none skipped). |
+| **Tests** | 490 Pest tests, all passing (Meilisearch was running, so none skipped). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
 | **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
@@ -96,6 +96,21 @@
 ## Log
 
 Newest first.
+
+### 2026-10-06: Explained counter staff sign-in and billing (no code changes)
+- Demo counter accounts staff1–3 (password `password`, PIN 3331–3333); register a browser as Counter 1–3 first, then PIN sign-in at `/pin-login`; billing steps with F-keys.
+
+### 2026-10-06: Explained selling and settling (no code changes)
+- Question: invoices stay "Reserved" and on-hand stock does not go down. Answer: that is by design until the invoice is **settled** at the main cashier (print reserves, settle issues). Gave the step-by-step: register MAIN terminal → open drawer → bill (counter or main) → F9 → POS → Cashier → Settle.
+
+### 2026-10-06: Local database rebuilt
+- Ran `php artisan migrate:fresh --seed` on the local `citizensDB` (environment local), then `scout:sync-index-settings` and `queue:work --stop-when-empty`. All migrations (incl. loose pricing / pack openings) and seeders ran; 21 demo products with the new pricing are in place (Okra Haritha 250g has no price on purpose). Demo logins unchanged (owner / manager / staff1–3, password `password`).
+
+### 2026-10-06: Real-world pricing, step 5 built (demo data, user guide, report) — pricing work complete
+- **Demo catalog** (`DevelopmentCatalogSeeder`) now follows the shop: Urea / TSP / MOP (loose, kg, two prices; Urea also has a wholesale from-1-kg price), Urea / TSP / MOP 50kg bags that open into them, Foliar Fertilizer 500ml bottle, Okra Haritha 10g / 50g / 100g / 250g packets with the owner's prices (250g left without a price), Glyphosate 1L bottle, Mancozeb packet, Tyre 26" and 28" as separate products, Tube with size variants (same price), Chain, Brake Cable. Needs `php artisan migrate:fresh --seed` locally (wipes local demo data).
+- **Report** Inventory → *Products without a selling price* (no current Retail price on any unit/tier, removed prices included; links to the edit form). Product list filter **No selling price**. Both use `PriceBook::whereWithoutPrice()`.
+- **User guide:** new 6.5 *How pricing works*, 7.7 *Opening sealed bags*; updated product form (Sold loose, Can be opened into, optional prices, variants vs separate products), import columns and example, search (`750g*urea`), stock movements, GRN *Open now*, billing (grams, wholesale fallback), reports list, `OPN-` numbers, common problems. Removed stray text in the contents list.
+- Tests: 2 more in `LoosePricingTest` (report + filter, demo catalog). Full suite 490 passing · Larastan 0 · Pint clean.
 
 ### 2026-10-06: Real-world pricing, step 4 built (importer reads the owner's sheet)
 - **Columns:** template headings now follow the owner's sheet (Product Name, Sinhala Name, Pack Size, Selling Price, Whole Sale Price, Price for Kg's (per kg), Price for grams (per kg) …) plus Opens Into / Loose Qty Per Pack. The owner's own headings ("Product Varients", "Whole Sale Price", "Price for Kg's", "Price for grams") and the old snake_case ones are read too (`ProductImportColumns::key()`).

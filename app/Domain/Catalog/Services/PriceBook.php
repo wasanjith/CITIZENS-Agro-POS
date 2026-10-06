@@ -3,8 +3,10 @@
 namespace App\Domain\Catalog\Services;
 
 use App\Domain\Catalog\Models\PriceList;
+use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductPrice;
 use App\Domain\Inventory\Support\Qty;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Reads current prices. A price is current when it is the latest row (by effective_from,
@@ -78,6 +80,39 @@ class PriceBook
         $listIds = array_values(array_unique(array_filter([$priceListId, $defaultListId])));
 
         return new SellingPrices($this->current($productIds, $listIds), $priceListId, $defaultListId);
+    }
+
+    /**
+     * Products with no current price on a price list (any unit, any quantity tier): they
+     * cannot be billed on that list. A price removed later (a null row) counts as none.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function whereWithoutPrice(Builder $query, int $priceListId): Builder
+    {
+        $now = now();
+
+        return $query->whereNotExists(fn ($prices) => $prices
+            ->selectRaw('1')
+            ->from('product_prices as pp')
+            ->whereColumn('pp.product_id', 'products.id')
+            ->where('pp.price_list_id', $priceListId)
+            ->whereNull('pp.variant_id')
+            ->whereNotNull('pp.price')
+            ->where('pp.effective_from', '<=', $now)
+            ->whereNotExists(fn ($newer) => $newer
+                ->selectRaw('1')
+                ->from('product_prices as newer')
+                ->whereColumn('newer.product_id', 'pp.product_id')
+                ->whereColumn('newer.price_list_id', 'pp.price_list_id')
+                ->whereColumn('newer.unit_id', 'pp.unit_id')
+                ->whereColumn('newer.min_qty', 'pp.min_qty')
+                ->whereNull('newer.variant_id')
+                ->where('newer.effective_from', '<=', $now)
+                ->where(fn ($later) => $later
+                    ->whereColumn('newer.effective_from', '>', 'pp.effective_from')
+                    ->orWhere(fn ($same) => $same->whereColumn('newer.effective_from', 'pp.effective_from')->whereColumn('newer.id', '>', 'pp.id')))));
     }
 
     /**

@@ -15,6 +15,11 @@ use Illuminate\Database\Seeder;
 
 /**
  * Demo products for local development and search testing (never run in production).
+ * They follow the shop's real pricing:
+ *   - every sealed pack is its own product (Okra 10g / 50g / 100g / 250g packet, Urea 50kg bag);
+ *   - loose fertilizer is weighed out, with a price per kg under 1 kg and a cheaper one from 1 kg;
+ *   - sealed bags open into their loose product (Inventory → Open packs, or "Open now" on a GRN);
+ *   - prices are optional: no wholesale price → retail; Okra 250g has no price yet.
  */
 class DevelopmentCatalogSeeder extends Seeder
 {
@@ -25,62 +30,104 @@ class DevelopmentCatalogSeeder extends Seeder
         $category = fn (string $name) => Category::where('name', $name)->value('id');
         $brand = fn (string $name) => Brand::firstOrCreate(['name' => $name])->id;
 
-        $products = [
-            // code, name, Sinhala, aliases, category, brand, base unit, [unit => factor], default sale unit,
-            // [unit => [retail, wholesale]], cost per base unit, attributes, variants [code => name]
-            ['1001', 'Urea 50kg', 'යූරියා', 'yuriya, urea bag, u50', 'Fertilizers', 'Lanka Fertilizer', 'kg', ['bag' => 50], 'bag',
-                ['kg' => ['190.00', '185.00'], 'bag' => ['9000.00', '8800.00']], '160', ['NPK' => '46-0-0'], []],
-            ['1002', 'Triple Super Phosphate (TSP) 50kg', 'ටී.එස්.පී.', 'tsp, triple super, pospet', 'Fertilizers', 'Lanka Fertilizer', 'kg', ['bag' => 50], 'bag',
-                ['kg' => ['210.00', '205.00'], 'bag' => ['10000.00', '9800.00']], '175', ['NPK' => '0-46-0'], []],
-            ['1003', 'Muriate of Potash (MOP) 50kg', 'එම්.ඕ.පී.', 'mop, potash, pottasiyam', 'Fertilizers', 'Baur', 'kg', ['bag' => 50], 'bag',
-                ['kg' => ['230.00', '225.00'], 'bag' => ['11000.00', '10800.00']], '190', ['NPK' => '0-0-60'], []],
-            ['2001', 'Big Onion Seeds 50g', 'ලොකු ළූණු බීජ', 'lunu, onion seed', 'Seeds', 'CIC', 'packet', [], 'packet',
-                ['packet' => ['1450.00', '1400.00']], '1150', [], []],
-            ['2002', 'Chilli Seeds MI-2 10g', 'මිරිස් බීජ', 'miris, chili seed', 'Seeds', 'CIC', 'packet', [], 'packet',
-                ['packet' => ['350.00', '330.00']], '260', [], []],
-            ['3001', 'Glyphosate 1L', 'ග්ලයිෆොසේට්', 'roundup, weed killer, wal nasaka', 'Herbicides', 'Hayleys Agro', 'litre', [], 'litre',
-                ['litre' => ['2400.00', '2300.00']], '1950', [], []],
-            ['3002', 'Mancozeb 1kg', 'මැන්කොසෙබ්', 'dithane, fungicide', 'Fungicides', 'Hayleys Agro', 'packet', [], 'packet',
-                ['packet' => ['1650.00', '1600.00']], '1300', [], []],
-            ['4001', 'Mammoty', 'උදැල්ල', 'udalla, hoe', 'Tools', null, 'piece', [], 'piece',
-                ['piece' => ['1850.00', '1800.00']], '1450', [], []],
-            ['5001', 'Bicycle Tyre', 'බයිසිකල් ටයරය', 'tyre, tire, bike tyre', 'Tyres', 'DSI', 'piece', [], 'piece',
-                ['piece' => ['2250.00', '2150.00']], '1800', [], ['5002' => '26"', '5003' => '28"']],
-            ['5010', 'Bicycle Tube', 'බයිසිකල් ටියුබ්', 'tube, tyre tube', 'Tubes', 'DSI', 'piece', [], 'piece',
-                ['piece' => ['850.00', '800.00']], '620', [], ['5011' => '26"', '5012' => '28"']],
-            ['5020', 'Bicycle Chain', 'බයිසිකල් දම්වැල', 'chain, damwela', 'Chains', 'KMC', 'piece', [], 'piece',
-                ['piece' => ['1350.00', '1300.00']], '1000', ['speed' => '1-speed'], []],
+        $okra = fn (string $code, string $size, ?string $cost, ?string $price, int $reorder) => [
+            'code' => $code, 'name' => "Okra Haritha {$size} packet", 'si' => "බණ්ඩක්කා (හරිත) {$size}", 'aliases' => 'bandakka, okra seed',
+            'category' => 'Seeds', 'brand' => 'Bathalagoda Agro', 'unit' => 'packet', 'cost' => $cost, 'reorder' => $reorder,
+            'prices' => $price !== null ? ['Retail' => ['packet' => $price]] : [],
         ];
 
-        foreach ($products as [$code, $name, $nameSi, $aliases, $categoryName, $brandName, $baseUnit, $extraUnits, $saleUnit, $prices, $cost, $attributes, $variants]) {
-            $product = Product::updateOrCreate(['short_code' => $code], [
-                'name' => $name,
-                'name_si' => $nameSi,
-                'aliases' => $aliases,
-                'category_id' => $category($categoryName),
-                'brand_id' => $brandName ? $brand($brandName) : null,
-                'base_unit_id' => $units[$baseUnit],
+        $products = [
+            // Loose fertilizer: Retail kg = under 1 kg, kg@1 = from 1 kg (both per kg).
+            ['code' => '1101', 'name' => 'Urea (loose)', 'si' => 'යූරියා (ලිහිල්)', 'aliases' => 'yuriya, urea', 'category' => 'Fertilizers', 'brand' => 'Lanka Fertilizer',
+                'unit' => 'kg', 'loose' => true, 'cost' => '200', 'reorder' => 25, 'attributes' => ['NPK' => '46-0-0'],
+                'prices' => ['Retail' => ['kg' => '300.00', 'kg@1' => '250.00'], 'Wholesale' => ['kg@1' => '240.00']]],
+            ['code' => '1102', 'name' => 'TSP (loose)', 'si' => 'ටී.එස්.පී. (ලිහිල්)', 'aliases' => 'tsp, triple super, pospet', 'category' => 'Fertilizers', 'brand' => 'Lanka Fertilizer',
+                'unit' => 'kg', 'loose' => true, 'cost' => '216', 'reorder' => 25, 'attributes' => ['NPK' => '0-46-0'],
+                'prices' => ['Retail' => ['kg' => '320.00', 'kg@1' => '270.00']]],
+            ['code' => '1103', 'name' => 'MOP (loose)', 'si' => 'එම්.ඕ.පී. (ලිහිල්)', 'aliases' => 'mop, potash, pottasiyam', 'category' => 'Fertilizers', 'brand' => 'Baur',
+                'unit' => 'kg', 'loose' => true, 'cost' => '230', 'reorder' => 25, 'attributes' => ['NPK' => '0-0-60'],
+                'prices' => ['Retail' => ['kg' => '340.00', 'kg@1' => '290.00']]],
+
+            // Sealed bags, sold whole or opened into the loose product.
+            ['code' => '1001', 'name' => 'Urea 50kg bag', 'si' => 'යූරියා 50kg මල්ල', 'aliases' => 'urea bag, u50', 'category' => 'Fertilizers', 'brand' => 'Lanka Fertilizer',
+                'unit' => 'bag', 'cost' => '10000', 'reorder' => 5, 'opens_into' => ['1101', '50'], 'attributes' => ['NPK' => '46-0-0'],
+                'prices' => ['Retail' => ['bag' => '12000.00'], 'Wholesale' => ['bag' => '11800.00']]],
+            ['code' => '1002', 'name' => 'TSP 50kg bag', 'si' => 'ටී.එස්.පී. 50kg මල්ල', 'aliases' => 'tsp bag', 'category' => 'Fertilizers', 'brand' => 'Lanka Fertilizer',
+                'unit' => 'bag', 'cost' => '10800', 'reorder' => 5, 'opens_into' => ['1102', '50'],
+                'prices' => ['Retail' => ['bag' => '13000.00'], 'Wholesale' => ['bag' => '12800.00']]],
+            ['code' => '1003', 'name' => 'MOP 50kg bag', 'si' => 'එම්.ඕ.පී. 50kg මල්ල', 'aliases' => 'mop bag, potash bag', 'category' => 'Fertilizers', 'brand' => 'Baur',
+                'unit' => 'bag', 'cost' => '11500', 'reorder' => 5, 'opens_into' => ['1103', '50'],
+                'prices' => ['Retail' => ['bag' => '14000.00'], 'Wholesale' => ['bag' => '13700.00']]],
+            ['code' => '1201', 'name' => 'Foliar Fertilizer 500ml bottle', 'si' => 'පත්‍ර පොහොර 500ml', 'aliases' => 'liquid fertilizer, foliar', 'category' => 'Fertilizers', 'brand' => 'Hayleys Agro',
+                'unit' => 'bottle', 'cost' => '700', 'reorder' => 10,
+                'prices' => ['Retail' => ['bottle' => '950.00'], 'Wholesale' => ['bottle' => '900.00']]],
+
+            // Seed packets: each pack size is its own product (prices from the owner's sheet).
+            $okra('2011', '10g', '72', '120.00', 50),
+            $okra('2012', '50g', '192', '290.00', 15),
+            $okra('2013', '100g', '348', '530.00', 15),
+            $okra('2014', '250g', null, null, 5),
+            ['code' => '2001', 'name' => 'Big Onion Seeds 50g packet', 'si' => 'ලොකු ළූණු බීජ 50g', 'aliases' => 'lunu, onion seed', 'category' => 'Seeds', 'brand' => 'CIC',
+                'unit' => 'packet', 'cost' => '1150', 'reorder' => 10, 'prices' => ['Retail' => ['packet' => '1450.00'], 'Wholesale' => ['packet' => '1400.00']]],
+            ['code' => '2002', 'name' => 'Chilli Seeds MI-2 10g packet', 'si' => 'මිරිස් බීජ 10g', 'aliases' => 'miris, chili seed', 'category' => 'Seeds', 'brand' => 'CIC',
+                'unit' => 'packet', 'cost' => '260', 'reorder' => 10, 'prices' => ['Retail' => ['packet' => '350.00']]],
+
+            ['code' => '3001', 'name' => 'Glyphosate 1L bottle', 'si' => 'ග්ලයිෆොසේට් 1L', 'aliases' => 'roundup, weed killer, wal nasaka', 'category' => 'Herbicides', 'brand' => 'Hayleys Agro',
+                'unit' => 'bottle', 'cost' => '1950', 'reorder' => 10, 'prices' => ['Retail' => ['bottle' => '2400.00'], 'Wholesale' => ['bottle' => '2300.00']]],
+            ['code' => '3002', 'name' => 'Mancozeb 1kg packet', 'si' => 'මැන්කොසෙබ් 1kg', 'aliases' => 'dithane, fungicide', 'category' => 'Fungicides', 'brand' => 'Hayleys Agro',
+                'unit' => 'packet', 'cost' => '1300', 'reorder' => 10, 'prices' => ['Retail' => ['packet' => '1650.00'], 'Wholesale' => ['packet' => '1600.00']]],
+            ['code' => '4001', 'name' => 'Mammoty', 'si' => 'උදැල්ල', 'aliases' => 'udalla, hoe', 'category' => 'Tools', 'brand' => null,
+                'unit' => 'piece', 'cost' => '1450', 'reorder' => 10, 'prices' => ['Retail' => ['piece' => '1850.00'], 'Wholesale' => ['piece' => '1800.00']]],
+
+            // Bicycle parts: sizes with different prices are separate products; the tube's sizes
+            // share one price, so they stay variants of one product.
+            ['code' => '5001', 'name' => 'Bicycle Tyre 26"', 'si' => 'බයිසිකල් ටයරය 26"', 'aliases' => 'tyre, tire, bike tyre', 'category' => 'Tyres', 'brand' => 'DSI',
+                'unit' => 'piece', 'cost' => '1800', 'reorder' => 5, 'prices' => ['Retail' => ['piece' => '2250.00'], 'Wholesale' => ['piece' => '2150.00']]],
+            ['code' => '5002', 'name' => 'Bicycle Tyre 28"', 'si' => 'බයිසිකල් ටයරය 28"', 'aliases' => 'tyre, tire, bike tyre', 'category' => 'Tyres', 'brand' => 'DSI',
+                'unit' => 'piece', 'cost' => '1950', 'reorder' => 5, 'prices' => ['Retail' => ['piece' => '2450.00'], 'Wholesale' => ['piece' => '2350.00']]],
+            ['code' => '5010', 'name' => 'Bicycle Tube', 'si' => 'බයිසිකල් ටියුබ්', 'aliases' => 'tube, tyre tube', 'category' => 'Tubes', 'brand' => 'DSI',
+                'unit' => 'piece', 'cost' => '620', 'reorder' => 10, 'prices' => ['Retail' => ['piece' => '850.00'], 'Wholesale' => ['piece' => '800.00']],
+                'variants' => ['5011' => '26"', '5012' => '28"']],
+            ['code' => '5020', 'name' => 'Bicycle Chain', 'si' => 'බයිසිකල් දම්වැල', 'aliases' => 'chain, damwela', 'category' => 'Chains', 'brand' => 'KMC',
+                'unit' => 'piece', 'cost' => '1000', 'reorder' => 10, 'attributes' => ['speed' => '1-speed'], 'prices' => ['Retail' => ['piece' => '1350.00'], 'Wholesale' => ['piece' => '1300.00']]],
+            ['code' => '5030', 'name' => 'Brake Cable', 'si' => 'බ්‍රේක් කේබලය', 'aliases' => 'break cable, brake wire', 'category' => 'Brakes', 'brand' => null,
+                'unit' => 'piece', 'cost' => '180', 'reorder' => 20, 'prices' => ['Retail' => ['piece' => '280.00']]],
+        ];
+
+        foreach ($products as $row) {
+            $variants = $row['variants'] ?? [];
+
+            $product = Product::updateOrCreate(['short_code' => $row['code']], [
+                'name' => $row['name'],
+                'name_si' => $row['si'],
+                'aliases' => $row['aliases'],
+                'category_id' => $category($row['category']),
+                'brand_id' => $row['brand'] ? $brand($row['brand']) : null,
+                'base_unit_id' => $units[$row['unit']],
+                'sold_loose' => $row['loose'] ?? false,
+                'opens_into_product_id' => isset($row['opens_into']) ? Product::where('short_code', $row['opens_into'][0])->value('id') : null,
+                'opens_into_qty' => $row['opens_into'][1] ?? null,
                 'has_variants' => $variants !== [],
-                'reorder_level' => 10,
-                'reorder_qty' => 20,
-                'reference_cost' => $cost,
+                'reorder_level' => $row['reorder'],
+                'reorder_qty' => $row['reorder'] * 2,
+                'reference_cost' => $row['cost'],
                 'min_selling_margin_pct' => 5,
-                'attributes' => $attributes ?: null,
+                'attributes' => ($row['attributes'] ?? []) ?: null,
                 'is_active' => true,
             ]);
 
-            foreach ([$baseUnit => 1, ...$extraUnits] as $unit => $factor) {
-                ProductUnit::updateOrCreate(['product_id' => $product->id, 'unit_id' => $units[$unit]], [
-                    'factor' => $factor,
-                    'is_default_sale' => $unit === $saleUnit,
-                    'is_default_purchase' => $unit === array_key_last([$baseUnit => 1, ...$extraUnits]),
-                ]);
-            }
+            ProductUnit::updateOrCreate(['product_id' => $product->id, 'unit_id' => $units[$row['unit']]], [
+                'factor' => 1,
+                'is_default_sale' => true,
+                'is_default_purchase' => true,
+            ]);
 
-            foreach ($prices as $unit => [$retail, $wholesale]) {
-                foreach (['Retail' => $retail, 'Wholesale' => $wholesale] as $list => $price) {
+            foreach ($row['prices'] as $list => $byUnit) {
+                foreach ($byUnit as $unit => $price) {
+                    [$unitName, $minQty] = array_pad(explode('@', $unit, 2), 2, '0');
+
                     ProductPrice::firstOrCreate(
-                        ['product_id' => $product->id, 'unit_id' => $units[$unit], 'price_list_id' => $lists[$list]],
+                        ['product_id' => $product->id, 'unit_id' => $units[$unitName], 'price_list_id' => $lists[$list], 'min_qty' => $minQty],
                         ['price' => $price, 'effective_from' => now()->subDay()],
                     );
                 }
@@ -96,6 +143,7 @@ class DevelopmentCatalogSeeder extends Seeder
             'mop' => ['muriate of potash', 'potash'],
             'tube' => ['tyre tube'],
             'mammoty' => ['udalla', 'hoe'],
+            'okra' => ['bandakka'],
         ];
 
         foreach ($synonyms as $term => $words) {

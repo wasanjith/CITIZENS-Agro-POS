@@ -12,6 +12,7 @@ use App\Domain\Reports\Reports\Finance\HandoverHistoryReport;
 use App\Domain\Reports\Reports\Inventory\DeadStockReport;
 use App\Domain\Reports\Reports\Inventory\ExpiryReport;
 use App\Domain\Reports\Reports\Inventory\MovementHistoryReport;
+use App\Domain\Reports\Reports\Inventory\ProductsWithoutPriceReport;
 use App\Domain\Reports\Reports\Inventory\ReorderListReport;
 use App\Domain\Reports\Reports\Inventory\StockValuationReport;
 use App\Domain\Reports\Reports\Inventory\StockVarianceReport;
@@ -71,6 +72,7 @@ class ReportRegistry
             app(ExpiryReport::class),
             app(DeadStockReport::class),
             app(ReorderListReport::class),
+            app(ProductsWithoutPriceReport::class),
             app(StockVarianceReport::class),
 
             app()->make(PurchasesReport::class, ['byItem' => false]),

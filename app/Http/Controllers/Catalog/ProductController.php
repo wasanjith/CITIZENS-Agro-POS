@@ -79,6 +79,12 @@ class ProductController extends Controller
                     app(StockAlerts::class)->whereLowStock($query);
                 }
             },
+            // Products the counter cannot bill: no current price on the default (Retail) list.
+            'no_price' => function (Builder $query, string $value): void {
+                if ($value === '1') {
+                    app(PriceBook::class)->whereWithoutPrice($query, (int) PriceList::default()?->id);
+                }
+            },
         ];
     }
 
