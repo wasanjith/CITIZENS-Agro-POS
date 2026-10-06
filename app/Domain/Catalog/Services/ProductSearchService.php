@@ -8,7 +8,9 @@ use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductUnit;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Inventory\Services\StockService;
+use App\Domain\Inventory\Support\Qty;
 use App\Models\User;
+use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +20,7 @@ use Throwable;
 /**
  * Product search for the POS and the back office.
  *
- *   1. "5*urea" → qty 5, term "urea".
+ *   1. "5*urea" → qty 5, term "urea"; "750g*urea" → qty 0.75 (grams of a kg product).
  *   2. An exact short code (product or variant) returns just that item.
  *   3. Otherwise Meilisearch; if it is down, MySQL FULLTEXT (ngram) + LIKE on short codes.
  *   4. Hits are hydrated from MySQL with live prices and live stock (on hand − reserved).
@@ -95,6 +97,13 @@ class ProductSearchService
 
         if (preg_match('/^(\d+(?:\.\d{1,3})?)\s*\*\s*(.*)$/u', $query, $matches) === 1 && (float) $matches[1] > 0) {
             return [$matches[1], trim($matches[2])];
+        }
+
+        // Grams of a loose product: "750g*urea" → 0.75 (kg).
+        if (preg_match('/^(\d+(?:\.\d+)?)\s*(g|gm|kg)\s*\*\s*(.*)$/iu', $query, $matches) === 1 && (float) $matches[1] > 0) {
+            $qty = mb_strtolower($matches[2]) === 'kg' ? Qty::of($matches[1]) : Qty::of($matches[1])->dividedBy(1000, Qty::SCALE, RoundingMode::HalfUp);
+
+            return $qty->isPositive() ? [Qty::format($qty), trim($matches[3])] : [null, $query];
         }
 
         return [null, $query];
@@ -225,12 +234,12 @@ class ProductSearchService
 
         /** @var Collection<int, Product> $products */
         $products = Product::query()
-            ->with(['brand', 'category', 'baseUnit', 'units.unit', 'variants' => fn ($query) => $query->where('is_active', true)])
+            ->with(['brand', 'category', 'baseUnit', 'units.unit', 'opensInto.baseUnit', 'variants' => fn ($query) => $query->where('is_active', true)])
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
 
-        $prices = $priceListId !== null ? $this->priceBook->forProducts($ids, $priceListId) : [];
+        $prices = $priceListId !== null ? $this->priceBook->selling($ids, $priceListId) : null;
         $showCost = $user?->can('viewCost', Product::class) ?? false;
         $stock = $this->stock->totals($ids);
         $expiry = $this->nearestExpiry($products->where('track_expiry', true)->keys()->all());
@@ -243,7 +252,7 @@ class ProductSearchService
                 continue;
             }
 
-            $base = $this->item($product, $prices[$id] ?? [], $showCost);
+            $base = $this->item($product, $prices, $showCost);
             $base['stock'] = $stock[$id][0]['available'] ?? '0.000';
             $base['expiry'] = $expiry[$id][0] ?? null;
             $variants = $onlyVariantId !== null
@@ -319,11 +328,13 @@ class ProductSearchService
     }
 
     /**
-     * @param  array<int, string>  $prices  unit_id => price
+     * @param  SellingPrices|null  $selling  null when no price list was asked for
      * @return array<string, mixed>
      */
-    private function item(Product $product, array $prices, bool $showCost): array
+    private function item(Product $product, ?SellingPrices $selling, bool $showCost): array
     {
+        $prices = $selling?->startingPrices($product->id) ?? [];
+
         $units = $product->units->map(fn (ProductUnit $unit) => [
             'id' => $unit->unit_id,
             'name' => $unit->unit->name,
@@ -331,6 +342,8 @@ class ProductSearchService
             'factor' => $unit->factor,
             'allows_decimal' => $unit->unit->allows_decimal,
             'price' => $prices[$unit->unit_id] ?? null,
+            // Rates by quantity in base units (loose goods: under 1 kg, from 1 kg).
+            'tiers' => $selling?->tiers($product, $unit->unit_id) ?? [],
             'is_default_sale' => $unit->is_default_sale,
             'is_default_purchase' => $unit->is_default_purchase,
         ])->values()->all();
@@ -357,6 +370,13 @@ class ProductSearchService
             'reorder_level' => $product->reorder_level,
             'track_batches' => $product->track_batches,
             'track_expiry' => $product->track_expiry,
+            'sold_loose' => $product->sold_loose,
+            'opens_into' => $product->opensInto !== null ? [
+                'id' => $product->opensInto->id,
+                'name' => $product->opensInto->name,
+                'qty' => $product->opens_into_qty,
+                'unit' => $product->opensInto->baseUnit?->symbol,
+            ] : null,
             'url' => route('catalog.products.show', $product),
         ];
 

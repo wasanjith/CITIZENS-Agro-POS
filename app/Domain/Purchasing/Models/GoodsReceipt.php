@@ -2,6 +2,7 @@
 
 namespace App\Domain\Purchasing\Models;
 
+use App\Domain\Inventory\Models\PackOpening;
 use App\Domain\Inventory\Support\StockReference;
 use App\Domain\Purchasing\Enums\GoodsReceiptStatus;
 use App\Domain\Purchasing\Policies\GoodsReceiptPolicy;
@@ -114,6 +115,16 @@ class GoodsReceipt extends Model implements StockReference
     public function lines(): HasMany
     {
         return $this->hasMany(GoodsReceiptLine::class)->orderBy('id');
+    }
+
+    /**
+     * Sealed packs opened into loose stock when this GRN was posted.
+     *
+     * @return HasMany<PackOpening, $this>
+     */
+    public function packOpenings(): HasMany
+    {
+        return $this->hasMany(PackOpening::class)->orderBy('id');
     }
 
     /**

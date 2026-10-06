@@ -43,6 +43,9 @@ class SaveGoodsReceiptRequest extends FormRequest
             'lines.*.unit_id' => ['required', 'integer'],
             'lines.*.qty' => ['required', 'numeric', 'gt:0', 'max:99999999999', 'decimal:0,3'],
             'lines.*.free_qty' => ['nullable', 'numeric', 'min:0', 'max:99999999999', 'decimal:0,3'],
+            // Sealed packs opened into their loose product on posting (base units), and what they weighed.
+            'lines.*.open_packs' => ['nullable', 'numeric', 'min:0', 'max:99999999999', 'decimal:0,3'],
+            'lines.*.open_weighed_qty' => ['nullable', 'numeric', 'gt:0', 'max:99999999999', 'decimal:0,3'],
             'lines.*.unit_cost' => ['required', 'numeric', 'min:0', 'max:9999999999999', 'decimal:0,2'],
             'lines.*.lot_no' => ['nullable', 'string', 'max:50'],
             'lines.*.mfg_date' => ['nullable', 'date', 'before_or_equal:today'],
@@ -90,6 +93,8 @@ class SaveGoodsReceiptRequest extends FormRequest
                 'po_line_id' => ($line['po_line_id'] ?? null) ?: null,
                 'variant_id' => ($line['variant_id'] ?? null) ?: null,
                 'free_qty' => ($line['free_qty'] ?? null) ?: 0,
+                'open_packs' => ($line['open_packs'] ?? null) ?: 0,
+                'open_weighed_qty' => ($line['open_weighed_qty'] ?? null) ?: null,
                 'lot_no' => trim((string) ($line['lot_no'] ?? '')) ?: null,
                 'mfg_date' => ($line['mfg_date'] ?? null) ?: null,
                 'expiry_date' => ($line['expiry_date'] ?? null) ?: null,

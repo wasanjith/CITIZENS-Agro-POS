@@ -46,6 +46,7 @@
             ['label' => 'Expiring stock', 'route' => 'inventory.batches.expiry', 'active' => 'inventory.batches.*', 'can' => 'inventory.view'],
             ['label' => 'Stock movements', 'route' => 'inventory.movements.index', 'active' => 'inventory.movements.*', 'can' => 'inventory.view'],
             ['label' => 'Adjustments', 'route' => 'inventory.adjustments.index', 'active' => 'inventory.adjustments.*', 'can' => ['inventory.adjust', 'inventory.adjust.approve']],
+            ['label' => 'Open packs', 'route' => 'inventory.pack-openings.index', 'active' => 'inventory.pack-openings.*', 'can' => 'inventory.adjust'],
             ['label' => 'Stocktakes', 'route' => 'inventory.stocktakes.index', 'active' => 'inventory.stocktakes.*', 'can' => 'inventory.stocktake'],
         ]],
         'Purchasing' => ['icon' => 'truck', 'items' => [

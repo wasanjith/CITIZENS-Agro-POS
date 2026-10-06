@@ -4,6 +4,7 @@ namespace App\Domain\Purchasing\Actions;
 
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Finance\Services\FinancePosting;
+use App\Domain\Inventory\Actions\OpenPacksAction;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Services\StockService;
 use App\Domain\Purchasing\Enums\GoodsReceiptStatus;
@@ -27,6 +28,7 @@ use Illuminate\Validation\ValidationException;
  *   - purchase order lines received, PO → PARTIAL or RECEIVED
  *   - supplier credited with the GRN total
  *   - supplier_products.last_cost and the product's reference cost updated
+ *   - packs marked "Open now" opened into their loose product (OpenPacksAction)
  *   - journal: Dr Inventory, Cr Accounts payable
  */
 class PostGoodsReceiptAction
@@ -35,6 +37,7 @@ class PostGoodsReceiptAction
         private readonly StockService $stock,
         private readonly SupplierLedger $ledger,
         private readonly FinancePosting $finance,
+        private readonly OpenPacksAction $openPacks,
     ) {}
 
     public function handle(GoodsReceipt $receipt, User $actor): GoodsReceipt
@@ -116,6 +119,18 @@ class PostGoodsReceiptAction
                 }
 
                 $this->rememberCost($receipt->supplier_id, $product, BigDecimal::of($line->unit_cost)->dividedBy($factor, 4, RoundingMode::HalfUp), $costPerBase);
+
+                if (BigDecimal::of($line->open_packs)->isPositive()) {
+                    $this->openPacks->handle(
+                        $product,
+                        $line->open_packs,
+                        $line->open_weighed_qty,
+                        $actor,
+                        $receipt,
+                        field: "lines.{$index}.open_packs",
+                        weighedField: "lines.{$index}.open_weighed_qty",
+                    );
+                }
             }
 
             if ($order !== null) {

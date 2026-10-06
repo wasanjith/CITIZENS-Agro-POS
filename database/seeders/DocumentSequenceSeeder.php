@@ -16,6 +16,7 @@ class DocumentSequenceSeeder extends Seeder
             ['type' => 'GRN', 'prefix' => 'GRN-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
             ['type' => 'SRN', 'prefix' => 'SRN-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
             ['type' => 'ADJ', 'prefix' => 'ADJ-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
+            ['type' => 'OPN', 'prefix' => 'OPN-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],
             ['type' => 'STK', 'prefix' => 'STK-{Y}-', 'padding' => 4, 'reset_period' => SequenceResetPeriod::Yearly],
             ['type' => 'CUST', 'prefix' => 'C-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Never],
             ['type' => 'RCP', 'prefix' => 'RCP-{Y}-', 'padding' => 5, 'reset_period' => SequenceResetPeriod::Yearly],

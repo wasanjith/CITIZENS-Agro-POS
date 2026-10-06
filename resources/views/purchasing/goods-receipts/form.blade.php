@@ -97,6 +97,16 @@
                                     <span class="font-medium" x-text="line.name"></span>
                                     <span class="block text-xs text-gray-500" x-show="line.outstanding_base !== null && line.outstanding_base !== undefined" x-text="'Still to come: ' + qtyText(line.outstanding_base) + ' ' + line.base_unit"></span>
                                     <span class="block text-xs text-gray-500" x-show="! line.po_line_id" x-cloak>Not on the order</span>
+                                    <template x-if="line.opens_into">
+                                        <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+                                            <label :for="`open-${line.key}`" class="font-medium">Open now</label>
+                                            <input type="number" :id="`open-${line.key}`" :name="`lines[${index}][open_packs]`" x-model="line.open_packs" min="0" step="any" placeholder="0" class="{{ $inputClass }} w-16 py-1 text-xs tabular">
+                                            <span x-text="line.base_unit"></span>
+                                            <span>→ <span x-text="line.opens_into.name"></span>, weighed</span>
+                                            <input type="number" :name="`lines[${index}][open_weighed_qty]`" x-model="line.open_weighed_qty" min="0" step="any" :placeholder="expectedLoose(line)" :disabled="! Number(line.open_packs)" class="{{ $inputClass }} w-20 py-1 text-xs tabular">
+                                            <span x-text="line.opens_into.unit"></span>
+                                        </div>
+                                    </template>
                                 </td>
                                 <td class="py-2 pr-3">
                                     <select :name="`lines[${index}][unit_id]`" x-model="line.unit_id" class="{{ $inputClass }} w-24" :disabled="!! line.po_line_id">
@@ -166,6 +176,9 @@
                 expiry_date: '',
                 mfg_date: '',
                 free_qty: '',
+                open_packs: '',
+                open_weighed_qty: '',
+                opens_into: null,
                 ...line,
                 key: nextKey++,
                 variant_id: line.variant_id ?? null,
@@ -188,6 +201,7 @@
                         units: item.units,
                         base_unit: item.base_unit,
                         track_expiry: item.track_expiry,
+                        opens_into: item.opens_into ?? null,
                         outstanding_base: null,
                     });
 
@@ -215,6 +229,12 @@
 
                 money(amount) {
                     return Number(amount).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                },
+
+                // Nominal weight of the packs being opened (packs × loose quantity per pack).
+                expectedLoose(line) {
+                    const packs = Number(line.open_packs) || 0;
+                    return packs ? this.qtyText(packs * Number(line.opens_into?.qty ?? 0)) : '';
                 },
 
                 qtyText(qty) {

@@ -74,6 +74,7 @@
                         <div class="shrink-0 text-right">
                             <p class="font-semibold tabular" x-text="item.price !== null ? 'Rs. ' + money(item.price) : 'No price'"></p>
                             <p class="text-xs text-gray-500" x-text="item.unit ? '/ ' + item.unit.symbol : ''"></p>
+                            <p x-show="(item.unit?.tiers ?? []).length > 1" class="text-xs font-medium text-brand-700" x-text="tiersText(item.unit)"></p>
                         </div>
                     </div>
                     <div class="mt-1 flex flex-wrap items-center gap-1 text-xs">
@@ -89,7 +90,7 @@
                 </li>
             </template>
             <li x-show="results.length === 0" class="px-3 py-8 text-center text-sm text-gray-500">
-                <span x-show="tab === 'search'">Type a code or name. Enter adds the highlighted item. <kbd class="rounded bg-gray-100 px-1">5*urea</kbd> adds 5.</span>
+                <span x-show="tab === 'search'">Type a code or name. Enter adds the highlighted item. <kbd class="rounded bg-gray-100 px-1">5*urea</kbd> adds 5, <kbd class="rounded bg-gray-100 px-1">750g*urea</kbd> adds 750 g.</span>
                 <span x-show="tab !== 'search'" x-cloak>Nothing here yet.</span>
             </li>
         </ul>
@@ -183,7 +184,7 @@
                                 <td class="px-2 py-2">
                                     <div class="flex items-center gap-1">
                                         <button type="button" @click.stop="step(index, -1)" class="size-7 rounded bg-gray-100 text-lg leading-none hover:bg-gray-200" aria-label="Less">−</button>
-                                        <input type="text" inputmode="decimal" x-model="line.qty" @input.debounce.300ms="changed()" @focus="$el.select()" class="w-16 rounded border-gray-300 px-1 py-1 text-center text-sm tabular" :aria-label="'Quantity of ' + line.name">
+                                        <input type="text" inputmode="decimal" x-model="line.qty" @input.debounce.300ms="changed()" @blur="normaliseQty(line)" @keydown.enter="normaliseQty(line)" @focus="$el.select()" class="w-16 rounded border-gray-300 px-1 py-1 text-center text-sm tabular" :aria-label="'Quantity of ' + line.name" :title="unitOf(line).symbol === 'kg' ? 'Type 750g for grams' : ''">
                                         <button type="button" @click.stop="step(index, 1)" class="size-7 rounded bg-gray-100 text-lg leading-none hover:bg-gray-200" aria-label="More">+</button>
                                         <select @change="setUnit(line, $event.target.value)" class="rounded border-gray-300 py-1 pl-1 pr-6 text-xs" :aria-label="'Unit of ' + line.name">
                                             <template x-for="unit in line.units" :key="unit.id">
@@ -191,8 +192,12 @@
                                             </template>
                                         </select>
                                     </div>
+                                    <p x-show="gramsText(line)" class="mt-0.5 pl-8 text-xs text-gray-500" x-text="gramsText(line)"></p>
                                 </td>
-                                <td class="px-2 py-2 text-right tabular" x-text="money(unitOf(line).price)"></td>
+                                <td class="px-2 py-2 text-right tabular">
+                                    <span x-text="money(unitPrice(line))"></span>
+                                    <p x-show="rateText(line)" class="text-xs text-brand-700" x-text="rateText(line)"></p>
+                                </td>
                                 <td class="px-2 py-2 text-right">
                                     <input type="text" inputmode="decimal" x-model="line.discount" @input.debounce.400ms="discountChanged(line)" placeholder="0" class="w-20 rounded border-gray-300 px-1 py-1 text-right text-sm tabular" :aria-label="'Discount on ' + line.name">
                                     <template x-if="lineNeedsApproval(line)">

@@ -3,6 +3,7 @@
 namespace App\Domain\Purchasing\Actions;
 
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Inventory\Support\Qty;
 use App\Domain\Purchasing\Enums\GoodsReceiptStatus;
 use App\Domain\Purchasing\Models\GoodsReceipt;
 use App\Domain\Purchasing\Models\GoodsReceiptLine;
@@ -20,7 +21,8 @@ use Illuminate\Validation\ValidationException;
  *
  * Expected $data (already validated):
  *   supplier_id, purchase_order_id, supplier_invoice_no, received_at, note, discount, tax
- *   lines: list of {po_line_id, product_id, variant_id, unit_id, qty, free_qty, unit_cost, lot_no, mfg_date, expiry_date}
+ *   lines: list of {po_line_id, product_id, variant_id, unit_id, qty, free_qty, unit_cost, lot_no, mfg_date, expiry_date,
+ *                   open_packs, open_weighed_qty}   (packs to open into the loose product when posted)
  */
 class SaveGoodsReceiptAction
 {
@@ -86,6 +88,7 @@ class SaveGoodsReceiptAction
                     }
                 }
 
+                $openPacks = $this->openPacks($product, $line, $factor, "lines.{$index}.open_packs");
                 $lineTotal = LineMath::lineTotal($line['qty'], (string) $line['unit_cost']);
                 $subtotal = $subtotal->plus($lineTotal);
 
@@ -99,6 +102,8 @@ class SaveGoodsReceiptAction
                     'base_qty' => (string) LineMath::qty($line['qty'])->multipliedBy($factor),
                     'unit_cost' => (string) LineMath::money($line['unit_cost']),
                     'free_qty' => (string) LineMath::qty($line['free_qty'] ?? '0'),
+                    'open_packs' => (string) $openPacks,
+                    'open_weighed_qty' => $openPacks->isPositive() && filled($line['open_weighed_qty'] ?? null) ? (string) LineMath::qty($line['open_weighed_qty']) : null,
                     'lot_no' => $line['lot_no'] ?? null,
                     'mfg_date' => $line['mfg_date'] ?? null,
                     'expiry_date' => $line['expiry_date'] ?? null,
@@ -118,5 +123,32 @@ class SaveGoodsReceiptAction
 
             return $receipt->refresh();
         });
+    }
+
+    /**
+     * Packs to open on posting, in base units. Only for a product set up to be opened,
+     * and never more than the line brings in (paid + free).
+     *
+     * @param  array<string, mixed>  $line
+     */
+    private function openPacks(Product $product, array $line, string $factor, string $field): BigDecimal
+    {
+        $packs = LineMath::qty($line['open_packs'] ?? '0');
+
+        if (! $packs->isPositive()) {
+            return LineMath::qty('0');
+        }
+
+        if ($product->opens_into_product_id === null) {
+            throw ValidationException::withMessages([$field => "{$product->name} cannot be opened: set \"Can be opened into\" on the product first."]);
+        }
+
+        $received = LineMath::qty($line['qty'])->plus(LineMath::qty($line['free_qty'] ?? '0'))->multipliedBy($factor);
+
+        if ($packs->isGreaterThan($received)) {
+            throw ValidationException::withMessages([$field => "{$product->name}: you cannot open more than this line brings in (".Qty::format($received).').']);
+        }
+
+        return $packs;
     }
 }

@@ -19,6 +19,7 @@ use App\Domain\HR\Models\SalaryAdvance;
 use App\Domain\Identity\Services\CashierAuthority;
 use App\Domain\Identity\Services\DelegationService;
 use App\Domain\Identity\Support\CurrentTerminal;
+use App\Domain\Inventory\Models\PackOpening;
 use App\Domain\Inventory\Models\StockAdjustment;
 use App\Domain\Inventory\Models\Stocktake;
 use App\Domain\Purchasing\Models\GoodsReceipt;
@@ -64,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
             'opening_stock' => OpeningStockEntry::class,
             'stock_adjustment' => StockAdjustment::class,
             'stocktake' => Stocktake::class,
+            'pack_opening' => PackOpening::class,
             'purchase_order' => PurchaseOrder::class,
             'goods_receipt' => GoodsReceipt::class,
             'supplier_return' => SupplierReturn::class,

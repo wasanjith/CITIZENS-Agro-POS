@@ -33,6 +33,9 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property int $category_id
  * @property int|null $brand_id
  * @property int $base_unit_id
+ * @property bool $sold_loose
+ * @property int|null $opens_into_product_id
+ * @property string|null $opens_into_qty
  * @property int|null $tax_id
  * @property bool $has_variants
  * @property bool $track_batches
@@ -49,7 +52,7 @@ use Spatie\Activitylog\Support\LogOptions;
  */
 #[Fillable([
     'short_code', 'sku', 'name', 'name_si', 'name_ta', 'aliases', 'description',
-    'category_id', 'brand_id', 'base_unit_id', 'tax_id',
+    'category_id', 'brand_id', 'base_unit_id', 'sold_loose', 'opens_into_product_id', 'opens_into_qty', 'tax_id',
     'has_variants', 'track_batches', 'track_expiry', 'reorder_level', 'reorder_qty',
     'min_selling_margin_pct', 'reference_cost', 'attributes', 'image_path', 'is_active', 'created_by',
 ])]
@@ -74,6 +77,9 @@ class Product extends Model
             'category_id' => 'integer',
             'brand_id' => 'integer',
             'base_unit_id' => 'integer',
+            'sold_loose' => 'boolean',
+            'opens_into_product_id' => 'integer',
+            'opens_into_qty' => 'decimal:3',
             'tax_id' => 'integer',
             'has_variants' => 'boolean',
             'track_batches' => 'boolean',
@@ -92,7 +98,8 @@ class Product extends Model
     {
         return LogOptions::defaults()
             ->logOnly([
-                'short_code', 'sku', 'name', 'name_si', 'aliases', 'category_id', 'brand_id', 'base_unit_id', 'tax_id',
+                'short_code', 'sku', 'name', 'name_si', 'aliases', 'category_id', 'brand_id', 'base_unit_id',
+                'sold_loose', 'opens_into_product_id', 'opens_into_qty', 'tax_id',
                 'has_variants', 'track_batches', 'track_expiry', 'reorder_level', 'reorder_qty',
                 'min_selling_margin_pct', 'reference_cost', 'is_active',
             ])
@@ -122,6 +129,16 @@ class Product extends Model
     public function baseUnit(): BelongsTo
     {
         return $this->belongsTo(Unit::class, 'base_unit_id');
+    }
+
+    /**
+     * The loose product this sealed pack is opened into (Urea 50kg bag → Urea loose).
+     *
+     * @return BelongsTo<Product, $this>
+     */
+    public function opensInto(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'opens_into_product_id')->withTrashed();
     }
 
     /**

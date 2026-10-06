@@ -25,12 +25,14 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $mfg_date
  * @property Carbon|null $expiry_date
  * @property string $free_qty in unit_id
+ * @property string $open_packs base units opened into the loose product on posting
+ * @property string|null $open_weighed_qty what the opened packs weighed (loose product's base units)
  * @property string $line_total
  * @property int|null $batch_id
  */
 #[Fillable([
     'goods_receipt_id', 'po_line_id', 'product_id', 'variant_id', 'unit_id', 'qty', 'base_qty', 'unit_cost',
-    'lot_no', 'mfg_date', 'expiry_date', 'free_qty', 'line_total', 'batch_id',
+    'lot_no', 'mfg_date', 'expiry_date', 'free_qty', 'open_packs', 'open_weighed_qty', 'line_total', 'batch_id',
 ])]
 class GoodsReceiptLine extends Model
 {
@@ -55,6 +57,8 @@ class GoodsReceiptLine extends Model
             'mfg_date' => 'date',
             'expiry_date' => 'date',
             'free_qty' => 'decimal:3',
+            'open_packs' => 'decimal:3',
+            'open_weighed_qty' => 'decimal:3',
             'line_total' => 'decimal:2',
             'batch_id' => 'integer',
         ];

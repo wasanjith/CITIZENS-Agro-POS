@@ -118,7 +118,8 @@ function deviceCookie(): string
  * Create a product the way the product form does. Needs CatalogSeeder (units, price lists, categories).
  *
  * units:  ['bag' => 50]                      extra units and their factor
- * prices: ['Retail' => ['kg' => '190.00']]   price list => unit => price
+ * prices: ['Retail' => ['kg' => '190.00']]   price list => unit => price;
+ *         'kg@1' => '250.00' is a quantity tier from 1 kg (loose products)
  */
 function createProduct(array $attributes = [], array $units = [], array $prices = [], array $variants = [], string $saleUnit = ''): Product
 {
@@ -144,11 +145,11 @@ function createProduct(array $attributes = [], array $units = [], array $prices 
             'is_default_sale' => $unit === ($saleUnit ?: $baseUnit),
             'is_default_purchase' => $unit === $baseUnit,
         ])->values()->all(),
-        'prices' => collect($prices)->flatMap(fn ($byUnit, $list) => collect($byUnit)->map(fn ($price, $unit) => [
-            'unit_id' => $unitIds[$unit],
-            'price_list_id' => $listIds[$list],
-            'price' => $price,
-        ])->values())->all(),
+        'prices' => collect($prices)->flatMap(fn ($byUnit, $list) => collect($byUnit)->map(function ($price, $unit) use ($unitIds, $listIds, $list): array {
+            [$unitName, $minQty] = array_pad(explode('@', (string) $unit, 2), 2, '0');
+
+            return ['unit_id' => $unitIds[$unitName], 'price_list_id' => $listIds[$list], 'min_qty' => $minQty, 'price' => $price];
+        })->values())->all(),
         'variants' => $variants,
     ];
 

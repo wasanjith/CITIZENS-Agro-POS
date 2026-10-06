@@ -25,7 +25,7 @@ trait PresentsProductLines
 
         /** @var Collection<int, Product> $products */
         $products = Product::withTrashed()
-            ->with(['units.unit', 'baseUnit', 'variants' => fn ($query) => $query->withTrashed()])
+            ->with(['units.unit', 'baseUnit', 'opensInto.baseUnit', 'variants' => fn ($query) => $query->withTrashed()])
             ->whereIn('id', $productIds)
             ->get()
             ->keyBy('id');
@@ -66,6 +66,13 @@ trait PresentsProductLines
             'reorder_level' => $product->reorder_level,
             'track_batches' => $product->track_batches,
             'track_expiry' => $product->track_expiry,
+            // Sealed pack that can be opened into a loose product (GRN "Open now").
+            'opens_into' => $product->relationLoaded('opensInto') && $product->opensInto !== null ? [
+                'id' => $product->opensInto->id,
+                'name' => $product->opensInto->name,
+                'qty' => $product->opens_into_qty,
+                'unit' => $product->opensInto->baseUnit?->symbol,
+            ] : null,
             'units' => $product->units->map(fn (ProductUnit $unit) => [
                 'id' => $unit->unit_id,
                 'name' => $unit->unit->name,

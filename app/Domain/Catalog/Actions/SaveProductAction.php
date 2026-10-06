@@ -7,9 +7,11 @@ use App\Domain\Catalog\Models\ProductPrice;
 use App\Domain\Catalog\Models\ProductUnit;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Services\PriceBook;
+use App\Domain\Inventory\Support\Qty;
 use App\Models\User;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +22,8 @@ use Illuminate\Validation\ValidationException;
  * Expected $data (already validated):
  *   product fields, plus
  *   units:    list of {unit_id, factor, is_default_sale, is_default_purchase}
- *   prices:   list of {unit_id, price_list_id, price}          (ignored without catalog.prices.manage)
+ *   prices:   list of {unit_id, price_list_id, min_qty?, price} (ignored without catalog.prices.manage)
+ *             min_qty = quantity tier in base units (loose products only); an empty price removes it
  *   variants: list of {id?, short_code, name, sku, attributes, is_active}
  *   reference_cost / min_selling_margin_pct                    (ignored without catalog.cost.view)
  */
@@ -28,7 +31,7 @@ class SaveProductAction
 {
     private const PRODUCT_FIELDS = [
         'short_code', 'sku', 'name', 'name_si', 'name_ta', 'aliases', 'description',
-        'category_id', 'brand_id', 'base_unit_id', 'tax_id',
+        'category_id', 'brand_id', 'base_unit_id', 'sold_loose', 'opens_into_product_id', 'opens_into_qty', 'tax_id',
         'track_batches', 'track_expiry', 'reorder_level', 'reorder_qty', 'attributes', 'is_active',
     ];
 
@@ -64,6 +67,10 @@ class SaveProductAction
 
             if (array_key_exists('prices', $data) && $actor->can('managePrices', Product::class)) {
                 $this->savePrices($product, $data['prices'], $actor);
+
+                if (! $product->sold_loose) {
+                    $this->removeQuantityPrices($product, $actor);
+                }
             }
 
             $product->refresh();
@@ -136,39 +143,77 @@ class SaveProductAction
 
     /**
      * Insert a new price row only where the price actually changed, so product_prices
-     * doubles as the price history.
+     * doubles as the price history. An empty price that is set today removes it (a row
+     * with a null price), so a wholesale customer falls back to the retail price.
      *
      * @param  list<array<string, mixed>>  $prices
      */
     private function savePrices(Product $product, array $prices, User $actor): void
     {
-        $current = $this->priceBook->forProduct($product->id);
+        $current = $this->priceBook->tiersForProduct($product->id);
         $factors = $product->units()->pluck('factor', 'unit_id');
         $now = now();
 
         foreach ($prices as $index => $row) {
-            if (($row['price'] ?? null) === null || $row['price'] === '' || ! $factors->has((int) $row['unit_id'])) {
+            $unitId = (int) $row['unit_id'];
+            $listId = (int) $row['price_list_id'];
+            $minQty = (string) Qty::of($row['min_qty'] ?? '0');
+
+            if (! $factors->has($unitId)) {
+                continue;
+            }
+
+            $existing = $current[$listId][$unitId][$minQty] ?? null;
+
+            if (($row['price'] ?? null) === null || $row['price'] === '') {
+                if ($existing !== null) {
+                    $this->insertPrice($product, $unitId, $listId, $minQty, null, $actor, $now);
+                }
+
                 continue;
             }
 
             $price = BigDecimal::of((string) $row['price'])->toScale(2, RoundingMode::HalfUp);
-            $existing = $current[(int) $row['price_list_id']][(int) $row['unit_id']] ?? null;
 
-            $this->guardMinimumPrice($product, $price, (string) $factors[(int) $row['unit_id']], "prices.{$index}.price");
+            $this->guardMinimumPrice($product, $price, (string) $factors[$unitId], "prices.{$index}.price");
 
             if ($existing !== null && BigDecimal::of($existing)->isEqualTo($price)) {
                 continue;
             }
 
-            ProductPrice::create([
-                'product_id' => $product->id,
-                'unit_id' => (int) $row['unit_id'],
-                'price_list_id' => (int) $row['price_list_id'],
-                'price' => (string) $price,
-                'effective_from' => $now,
-                'created_by' => $actor->id,
-            ]);
+            $this->insertPrice($product, $unitId, $listId, $minQty, (string) $price, $actor, $now);
         }
+    }
+
+    /**
+     * A product that is no longer sold loose keeps only its any-quantity prices.
+     */
+    private function removeQuantityPrices(Product $product, User $actor): void
+    {
+        $now = now();
+
+        foreach ($this->priceBook->tiersForProduct($product->id) as $listId => $units) {
+            foreach ($units as $unitId => $tiers) {
+                foreach (array_keys($tiers) as $minQty) {
+                    if ((string) $minQty !== '0.000') {
+                        $this->insertPrice($product, $unitId, $listId, (string) $minQty, null, $actor, $now);
+                    }
+                }
+            }
+        }
+    }
+
+    private function insertPrice(Product $product, int $unitId, int $listId, string $minQty, ?string $price, User $actor, CarbonInterface $now): void
+    {
+        ProductPrice::create([
+            'product_id' => $product->id,
+            'unit_id' => $unitId,
+            'min_qty' => $minQty,
+            'price_list_id' => $listId,
+            'price' => $price,
+            'effective_from' => $now,
+            'created_by' => $actor->id,
+        ]);
     }
 
     /**

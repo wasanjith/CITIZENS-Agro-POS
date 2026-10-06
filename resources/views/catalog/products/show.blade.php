@@ -37,7 +37,10 @@
                     <div class="sm:col-span-2"><dt class="text-gray-500">Aliases</dt><dd>{{ $product->aliases ?: '—' }}</dd></div>
                     <div><dt class="text-gray-500">Brand</dt><dd>{{ $product->brand?->name ?? '—' }}</dd></div>
                     <div><dt class="text-gray-500">SKU</dt><dd>{{ $product->sku ?: '—' }}</dd></div>
-                    <div><dt class="text-gray-500">Base unit</dt><dd>{{ $product->baseUnit?->name }}</dd></div>
+                    <div><dt class="text-gray-500">Base unit</dt><dd>{{ $product->baseUnit?->name }}@if ($product->sold_loose) <x-ui.badge color="blue">sold loose</x-ui.badge>@endif</dd></div>
+                    @if ($product->opensInto)
+                        <div><dt class="text-gray-500">Opens into</dt><dd><a href="{{ route('catalog.products.show', $product->opensInto) }}" class="text-brand-700 hover:underline">{{ $product->opensInto->name }}</a> · {{ \App\Domain\Inventory\Support\Qty::format($product->opens_into_qty) }} {{ $product->opensInto->baseUnit?->symbol }} per {{ $product->baseUnit?->symbol }}</dd></div>
+                    @endif
                     <div><dt class="text-gray-500">Tax</dt><dd>{{ $product->tax?->label() ?? 'No tax' }}</dd></div>
                     @if ($product->attributes)
                         <div class="sm:col-span-2">
@@ -86,11 +89,14 @@
                                     </td>
                                     @foreach ($priceLists as $list)
                                         <td class="py-2 pr-4 text-right tabular">
-                                            @isset($prices[$list->id][$unit->unit_id])
-                                                {{ number_format((float) $prices[$list->id][$unit->unit_id], 2) }}
-                                            @else
+                                            @forelse ($prices[$list->id][$unit->unit_id] ?? [] as $minQty => $price)
+                                                <span class="block">
+                                                    @if ((float) $minQty > 0)<span class="text-xs text-gray-500">from {{ \App\Domain\Inventory\Support\Qty::format($minQty) }} {{ $product->baseUnit?->symbol }}:</span>@endif
+                                                    {{ number_format((float) $price, 2) }}
+                                                </span>
+                                            @empty
                                                 <span class="text-gray-400">—</span>
-                                            @endisset
+                                            @endforelse
                                         </td>
                                     @endforeach
                                     @if ($canCost)
@@ -151,8 +157,8 @@
                             <tr>
                                 <td class="whitespace-nowrap text-gray-600">{{ $price->effective_from->format('Y-m-d H:i') }}</td>
                                 <td>{{ $price->priceList->name }}</td>
-                                <td>{{ $price->unit->name }}</td>
-                                <td class="text-right tabular">{{ number_format((float) $price->price, 2) }}</td>
+                                <td>{{ $price->unit->name }}@if ((float) $price->min_qty > 0) <span class="text-xs text-gray-500">from {{ \App\Domain\Inventory\Support\Qty::format($price->min_qty) }} {{ $product->baseUnit?->symbol }}</span>@endif</td>
+                                <td class="text-right tabular">{{ $price->price !== null ? number_format((float) $price->price, 2) : 'Removed' }}</td>
                                 <td class="text-gray-600">{{ $price->creator?->name ?? '—' }}</td>
                             </tr>
                         @endforeach

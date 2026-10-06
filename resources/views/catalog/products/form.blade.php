@@ -6,7 +6,7 @@
     $canCost = auth()->user()->can('viewCost', \App\Domain\Catalog\Models\Product::class);
 
     $tabs = [
-        'general' => ['label' => 'General', 'fields' => ['short_code', 'sku', 'name', 'category_id', 'brand_id', 'base_unit_id', 'tax_id', 'description']],
+        'general' => ['label' => 'General', 'fields' => ['short_code', 'sku', 'name', 'category_id', 'brand_id', 'base_unit_id', 'tax_id', 'description', 'sold_loose', 'opens_into_product_id', 'opens_into_qty']],
         'units' => ['label' => 'Units & Prices', 'fields' => ['units', 'prices', 'reference_cost', 'min_selling_margin_pct']],
         'variants' => ['label' => 'Variants', 'fields' => ['variants']],
         'names' => ['label' => 'Search & Names', 'fields' => ['name_si', 'name_ta', 'aliases', 'attribute_rows']],
@@ -46,6 +46,7 @@
             code: @js(old('short_code', $product->short_code)),
             categoryId: @js((string) old('category_id', $product->category_id)),
             baseUnitId: @js((string) old('base_unit_id', $product->base_unit_id)),
+            soldLoose: @js((bool) old('sold_loose', $product->sold_loose)),
             units: @js($units->map(fn ($unit) => ['id' => $unit->id, 'name' => $unit->name, 'symbol' => $unit->symbol])->values()),
             priceLists: @js($priceLists->map(fn ($list) => ['id' => $list->id, 'name' => $list->name])->values()),
             unitRows: @js($unitRows),
@@ -105,6 +106,16 @@
                         hint="Stock is counted in this unit. Other units are set on the Units & Prices tab."
                     />
                     <x-ui.select name="tax_id" label="Tax" :options="$taxes" :value="$product->tax_id" placeholder="No tax" />
+                    <x-ui.checkbox name="sold_loose" x-model="soldLoose" label="Sold loose (weighed out)" hint="Fertilizer weighed at the counter. It can have a price for small amounts and a cheaper price from 1 kg. Sealed packets and bags are separate products: leave this off for them." :checked="$product->sold_loose" class="sm:col-span-2" />
+                    <x-ui.select
+                        name="opens_into_product_id"
+                        label="Can be opened into"
+                        :options="$looseProducts"
+                        :value="$product->opens_into_product_id"
+                        placeholder="Not opened (sealed only)"
+                        hint="For a sealed bag that is sometimes opened and sold loose, e.g. Urea 50kg bag → Urea (loose)."
+                    />
+                    <x-ui.qty-input name="opens_into_qty" label="Loose quantity in one pack" :value="$product->opens_into_qty" hint="Base units of the loose product, e.g. 50 (kg) for a 50 kg bag." />
                     <x-ui.textarea name="description" label="Description" :value="$product->description" class="sm:col-span-2" />
                     <x-ui.checkbox name="is_active" label="Active" hint="Inactive products are hidden from the POS search." :checked="$product->is_active" class="sm:col-span-2" />
                 </div>
@@ -198,6 +209,10 @@
             @endif
 
             <x-ui.card title="Prices" :description="$canPrices ? 'Price of one unit on each price list. A change is saved as a new price; the old one stays in the history.' : 'You can view prices but not change them.'">
+                <p x-show="soldLoose" x-cloak class="mb-3 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900">
+                    Sold loose: enter the price <strong>per <span x-text="unitName(baseUnitId)"></span></strong> for small amounts (under 1 <span x-text="unitSymbol(baseUnitId)"></span>) and the price per <span x-text="unitName(baseUnitId)"></span> from 1 <span x-text="unitSymbol(baseUnitId)"></span>.
+                    Leave a box empty for no price; wholesale customers then pay the retail price.
+                </p>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead class="text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
@@ -209,27 +224,32 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <template x-for="(row, rowIndex) in submittedUnits()" :key="'p' + row.unit_id">
+                            <template x-for="(row, rowIndex) in priceRows()" :key="'p' + row.unit_id + '@' + row.min_qty">
                                 <tr>
-                                    <td class="py-2 pr-3 font-medium" x-text="unitName(row.unit_id)"></td>
+                                    <td class="py-2 pr-3">
+                                        <span class="font-medium" x-text="unitName(row.unit_id)"></span>
+                                        <span x-show="row.label" class="block text-xs text-gray-500" x-text="row.label"></span>
+                                    </td>
                                     <template x-for="(list, listIndex) in priceLists" :key="list.id">
                                         <td class="py-2 pr-3 align-top">
                                             @if ($canPrices)
                                                 <input type="hidden" :name="`prices[${rowIndex * priceLists.length + listIndex}][unit_id]`" :value="row.unit_id">
                                                 <input type="hidden" :name="`prices[${rowIndex * priceLists.length + listIndex}][price_list_id]`" :value="list.id">
+                                                <input type="hidden" :name="`prices[${rowIndex * priceLists.length + listIndex}][min_qty]`" :value="row.min_qty">
                                                 <input
                                                     type="text"
                                                     inputmode="decimal"
                                                     :name="`prices[${rowIndex * priceLists.length + listIndex}][price]`"
-                                                    x-model="prices[list.id + ':' + row.unit_id]"
+                                                    x-model="prices[priceKey(list.id, row)]"
                                                     class="{{ $inputClass }} w-32 text-right tabular"
                                                     :class="belowMinimum(list.id, row) ? 'border-red-400' : ''"
-                                                    :aria-label="list.name + ' price per ' + unitName(row.unit_id)"
+                                                    :aria-label="list.name + ' price per ' + unitName(row.unit_id) + (row.label ? ', ' + row.label : '')"
                                                     placeholder="0.00"
                                                 >
                                             @else
-                                                <span class="tabular" x-text="prices[list.id + ':' + row.unit_id] || '—'"></span>
+                                                <span class="tabular" x-text="prices[priceKey(list.id, row)] || '—'"></span>
                                             @endif
+                                            <p x-show="per100g(list.id, row)" class="mt-1 text-xs text-gray-500" x-text="per100g(list.id, row)"></p>
                                             @if ($canCost)
                                                 <p class="mt-1 text-xs" :class="belowMinimum(list.id, row) ? 'text-red-700' : 'text-gray-500'" x-text="marginText(list.id, row)"></p>
                                             @endif
@@ -372,6 +392,40 @@
                     return this.units.find((unit) => String(unit.id) === String(id))?.name ?? '';
                 },
 
+                unitSymbol(id) {
+                    return this.units.find((unit) => String(unit.id) === String(id))?.symbol ?? '';
+                },
+
+                /**
+                 * One price row per unit; a loose product's base unit gets two:
+                 * small amounts (from 0) and from 1 base unit.
+                 */
+                priceRows() {
+                    const symbol = this.unitSymbol(this.baseUnitId);
+
+                    return this.submittedUnits().flatMap((row) => {
+                        if (!this.soldLoose || String(row.unit_id) !== String(this.baseUnitId)) {
+                            return [{ ...row, min_qty: '0', label: '' }];
+                        }
+
+                        return [
+                            { ...row, min_qty: '0', label: `Under 1 ${symbol} (price per ${symbol})` },
+                            { ...row, min_qty: '1', label: `1 ${symbol} and above (price per ${symbol})` },
+                        ];
+                    });
+                },
+
+                priceKey(listId, row) {
+                    return Number(row.min_qty) > 0 ? `${listId}:${row.unit_id}@${Number(row.min_qty)}` : `${listId}:${row.unit_id}`;
+                },
+
+                /** "= Rs. 30.00 per 100 g" under a loose price per kg. */
+                per100g(listId, row) {
+                    const price = parseFloat(this.prices[this.priceKey(listId, row)]);
+                    if (!this.soldLoose || this.unitSymbol(row.unit_id) !== 'kg' || !Number.isFinite(price)) return '';
+                    return '= Rs. ' + (price / 10).toFixed(2) + ' per 100 g';
+                },
+
                 submittedUnits() {
                     if (!this.baseUnitId) return [];
                     const extras = this.extraUnits.filter((row) => row.unit_id && row.factor);
@@ -404,14 +458,14 @@
                 belowMinimum(listId, row) {
                     const cost = this.unitCost(row);
                     const margin = parseFloat(this.margin);
-                    const price = parseFloat(this.prices[listId + ':' + row.unit_id]);
+                    const price = parseFloat(this.prices[this.priceKey(listId, row)]);
                     if (cost === null || !Number.isFinite(margin) || !Number.isFinite(price)) return false;
                     return price < cost * (1 + margin / 100) - 0.004;
                 },
 
                 marginText(listId, row) {
                     const cost = this.unitCost(row);
-                    const price = parseFloat(this.prices[listId + ':' + row.unit_id]);
+                    const price = parseFloat(this.prices[this.priceKey(listId, row)]);
                     if (cost === null) return '';
                     if (!Number.isFinite(price)) return 'Cost ' + cost.toFixed(2);
                     return 'Cost ' + cost.toFixed(2) + ' · margin ' + ((price - cost) / cost * 100).toFixed(1) + '%';

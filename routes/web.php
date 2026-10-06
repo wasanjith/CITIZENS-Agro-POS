@@ -44,6 +44,7 @@ use App\Http\Controllers\HR\PayrollController;
 use App\Http\Controllers\HR\PayslipController;
 use App\Http\Controllers\HR\SalaryAdvanceController;
 use App\Http\Controllers\HR\SalaryComponentController;
+use App\Http\Controllers\Inventory\PackOpeningController;
 use App\Http\Controllers\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Inventory\StockController;
 use App\Http\Controllers\Inventory\StockMovementController;
@@ -231,6 +232,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('adjustments', StockAdjustmentController::class)->only(['index', 'create', 'store', 'show']);
         Route::post('adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
         Route::post('adjustments/{adjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
+
+        Route::resource('pack-openings', PackOpeningController::class)->only(['index', 'create', 'store', 'show']);
 
         Route::resource('stocktakes', StocktakeController::class)->only(['index', 'create', 'store', 'show']);
         Route::get('stocktakes/{stocktake}/count', [StocktakeController::class, 'count'])->name('stocktakes.count');

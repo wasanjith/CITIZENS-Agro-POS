@@ -62,7 +62,12 @@
                                         <span class="block text-xs text-gray-500">{{ $receipt->purchase_order_id ? 'Not on the order' : '' }}</span>
                                     @endunless
                                 </td>
-                                <td class="py-2 pr-3 text-right tabular whitespace-nowrap">{{ Qty::format($line->qty) }} {{ $line->unit->symbol }}</td>
+                                <td class="py-2 pr-3 text-right tabular whitespace-nowrap">
+                                    {{ Qty::format($line->qty) }} {{ $line->unit->symbol }}
+                                    @if ((float) $line->open_packs > 0)
+                                        <span class="block text-xs text-amber-800">{{ $receipt->posted_at ? 'Opened' : 'Open on posting' }}: {{ Qty::format($line->open_packs) }} {{ $line->product->baseUnit?->symbol }}</span>
+                                    @endif
+                                </td>
                                 <td class="py-2 pr-3 text-right tabular">{{ (float) $line->free_qty ? Qty::format($line->free_qty) : '—' }}</td>
                                 <td class="py-2 pr-3 text-gray-600">
                                     {{ $line->lot_no ? 'Lot '.$line->lot_no : '' }}
@@ -85,6 +90,20 @@
                     <div class="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold"><dt>Total owed</dt><dd class="tabular">Rs. {{ number_format((float) $receipt->total, 2) }}</dd></div>
                 </dl>
             </div>
+
+            @if ($receipt->packOpenings->isNotEmpty())
+                <div class="mt-6 border-t border-gray-200 pt-4">
+                    <p class="text-sm font-medium">Opened into loose stock</p>
+                    <ul class="mt-2 space-y-1 text-sm text-gray-700">
+                        @foreach ($receipt->packOpenings as $opening)
+                            <li>
+                                <a href="{{ route('inventory.pack-openings.show', $opening) }}" class="font-mono text-brand-700 hover:underline">{{ $opening->number }}</a>
+                                · {{ Qty::format($opening->packs) }} opened → {{ $opening->looseProduct->name }} +{{ Qty::format($opening->weighed_qty) }} {{ $opening->looseProduct->baseUnit?->symbol }}
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         </x-ui.card>
 
         <x-ui.card title="Details">

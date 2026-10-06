@@ -16,6 +16,8 @@ enum MovementType: string
     case AdjustOut = 'adjust_out';
     case Damage = 'damage';
     case Stocktake = 'stocktake';
+    case RepackOut = 'repack_out';
+    case RepackIn = 'repack_in';
 
     public function label(): string
     {
@@ -29,6 +31,8 @@ enum MovementType: string
             self::AdjustOut => 'Adjustment (out)',
             self::Damage => 'Damage',
             self::Stocktake => 'Stocktake',
+            self::RepackOut => 'Pack opened',
+            self::RepackIn => 'From opened pack',
         };
     }
 

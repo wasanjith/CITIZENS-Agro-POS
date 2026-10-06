@@ -6,6 +6,7 @@ use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductUnit;
 use App\Domain\Catalog\Services\PriceBook;
+use App\Domain\Catalog\Services\SellingPrices;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Support\Qty;
 use App\Domain\Sales\Enums\ApprovalStatus;
@@ -24,6 +25,10 @@ use Illuminate\Validation\ValidationException;
  * Prices a counter cart on the server. Client prices are never trusted: every line is
  * repriced from the price book, discounts are checked against the user's limit and
  * approved requests, and totals are recomputed.
+ *
+ * A line's price comes from the cart's price list, or from the default (Retail) list
+ * when that list has none. Loose products pick the rate for the line's weight
+ * (e.g. under 1 kg, or 1 kg and above).
  *
  * Input (from the POS screen):
  *   cart_uuid, price_list_id, customer_id, quotation_id, payment_method, tendered,
@@ -59,7 +64,7 @@ class CartPricer
             ->whereIn('id', $productIds)
             ->get()
             ->keyBy('id');
-        $prices = $this->priceBook->forProducts($productIds, $priceListId);
+        $prices = $this->priceBook->selling($productIds, $priceListId);
         $approvals = $this->approvals($cartUuid, $rawLines, $cart);
         $maxPercent = $this->limits->maxPercentFor($user);
         $taxRegistered = (bool) $this->settings->get('tax.registered', false);
@@ -165,10 +170,9 @@ class CartPricer
     /**
      * @param  array<string, mixed>  $raw
      * @param  Collection<int, Product>  $products
-     * @param  array<int, array<int, string>>  $prices
      * @return array<string, mixed>|null
      */
-    private function priceLine(array $raw, string $field, Collection $products, array $prices, bool $strict): ?array
+    private function priceLine(array $raw, string $field, Collection $products, SellingPrices $prices, bool $strict): ?array
     {
         $product = $products->get((int) ($raw['product_id'] ?? 0));
 
@@ -206,13 +210,15 @@ class CartPricer
             return $this->fail($strict, "{$field}.qty", "{$product->name} is sold in whole {$productUnit->unit->name}s.");
         }
 
-        $unitPrice = $prices[$product->id][$productUnit->unit_id] ?? null;
+        $baseQty = $qty->multipliedBy($productUnit->factor)->toScale(Qty::SCALE, RoundingMode::HalfUp);
+        $quote = $prices->quote($product, $productUnit->unit_id, $baseQty);
 
-        if ($unitPrice === null) {
+        if ($quote === null) {
             return $this->fail($strict, "{$field}.unit_id", "{$product->name} has no price per {$productUnit->unit->name}.");
         }
 
-        $unitPrice = Money::of($unitPrice);
+        $startingPrices = $prices->startingPrices($product->id);
+        $unitPrice = Money::of($quote->price);
         $gross = $qty->multipliedBy($unitPrice)->toScale(2, RoundingMode::HalfUp);
         $taxRate = $product->tax !== null && $product->tax->is_active ? (string) $product->tax->rate : '0';
 
@@ -221,6 +227,9 @@ class CartPricer
             'product_id' => $product->id,
             'variant_id' => $variantId,
             'unit_id' => $productUnit->unit_id,
+            'price_list_id' => $quote->priceListId,
+            // Quantity tier of the price in base units ("0.000" = any quantity).
+            'price_tier' => $quote->minQty,
             'short_code' => $variant !== null ? $variant->short_code : $product->short_code,
             'name' => $variant !== null ? "{$product->name} {$variant->name}" : $product->name,
             'name_si' => $product->name_si !== null && $variant !== null ? "{$product->name_si} {$variant->name}" : $product->name_si,
@@ -230,7 +239,8 @@ class CartPricer
             'allows_decimal' => $productUnit->unit->allows_decimal,
             'qty' => (string) $qty,
             'factor' => (string) Qty::of($productUnit->factor),
-            'base_qty' => (string) $qty->multipliedBy($productUnit->factor)->toScale(Qty::SCALE, RoundingMode::HalfUp),
+            'base_qty' => (string) $baseQty,
+            'sold_loose' => $product->sold_loose,
             'unit_price' => (string) $unitPrice,
             'units' => $product->units->map(fn (ProductUnit $unit) => [
                 'id' => $unit->unit_id,
@@ -238,8 +248,9 @@ class CartPricer
                 'name' => $unit->unit->name,
                 'factor' => (string) Qty::of($unit->factor),
                 'allows_decimal' => $unit->unit->allows_decimal,
-                'price' => $prices[$product->id][$unit->unit_id] ?? null,
-            ])->filter(fn (array $unit) => $unit['price'] !== null)->values()->all(),
+                'price' => $startingPrices[$unit->unit_id] ?? null,
+                'tiers' => $prices->tiers($product, $unit->unit_id),
+            ])->filter(fn (array $unit) => $unit['tiers'] !== [])->values()->all(),
             '_gross' => $gross,
             '_tax_rate' => $taxRate,
         ];

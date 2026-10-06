@@ -1,7 +1,7 @@
 # CITIZENS Agro POS: Task Log
 
 > Running record of project progress. Updated after every request.
-> Plan: [ARCHITECTURE.md](ARCHITECTURE.md) · [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) · Printing: [PRINTING.md](PRINTING.md)
+> Plan: [ARCHITECTURE.md](ARCHITECTURE.md) · [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) · Printing: [PRINTING.md](PRINTING.md) · Users: [USER_GUIDE.md](USER_GUIDE.md)
 
 ---
 
@@ -10,8 +10,8 @@
 | Item | Status |
 |---|---|
 | **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
-| **Last updated** | 2026-09-26 |
-| **Tests** | 449 Pest tests, all passing (Meilisearch was running, so none skipped). |
+| **Last updated** | 2026-10-06 |
+| **Tests** | 483 Pest tests, all passing (Meilisearch was running, so none skipped). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
 | **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
@@ -96,6 +96,47 @@
 ## Log
 
 Newest first.
+
+### 2026-10-06: Real-world pricing, step 3 built (loose price inputs, grams at the counter)
+- **Product form:** with "Sold loose" ticked, the base unit gets two price rows per list: "Under 1 kg (price per kg)" and "1 kg and above (price per kg)", each with "= Rs. X per 100 g" under it, so the owner's "price for grams" can be entered whatever unit it is quoted in. Empty box = no price (wholesale falls back to retail). Unticking "Sold loose" removes the quantity prices.
+- **Counter:** each unit carries its rates (`SellingPrices::tiers()`, fallback applied), so the screen shows the right rate and "under 1 kg" / "from 1 kg"; unit prices refresh from the server after every sync (also fixes stale prices after a price list change). Quantity box accepts `750g`, `750 g`, `2kg`; lines under 1 kg show "750 g". Search accepts `750g*urea`; results show "from 1 kg: 250.00".
+- **Invoice:** "0.75 kg (750 g) × 300.00" for amounts under 1 kg.
+- `npm run build` done. Tests: 11 more in `LoosePricingTest.php`; full suite 483 passing · Larastan 0 · Pint clean.
+- Still to confirm with the owner: the unit of their "Price for grams" figure (the form takes Rs. per kg and shows the per-100 g equivalent). Next: step 4 importer.
+
+### 2026-10-06: Real-world pricing, steps 1–2 built (loose tiers, retail fallback, Open packs)
+- **Migration** `2026_10_06_103901_add_loose_pricing_and_pack_openings`: `products.sold_loose`, `products.opens_into_product_id` + `opens_into_qty`; `product_prices.min_qty` (quantity tier, base units) and nullable `price` (null row = price removed, history kept); `sale_items.price_list_id`; `grn_lines.open_packs` + `open_weighed_qty`; new `pack_openings` table. Run `php artisan migrate` on the dev database.
+- **Pricing:** `PriceBook::selling()` → `SellingPrices::quote()` picks the customer's list, else Retail; loose products pick the tier for the line's weight (e.g. Rs. 300/kg under 1 kg, Rs. 250/kg from 1 kg). Sealed products ignore tiers. `CartPricer` uses it; each invoice line stores the list its price came from. Search results show the retail fallback. Clearing a price on the product form now removes it (wholesale → retail). Tier prices are checked against the minimum margin. Price Changes report shows tiers and removed prices.
+- **Product form:** "Sold loose", "Can be opened into" and "Loose quantity in one pack". Product page shows tiers, the link and "Removed" in the price history. (Tier price inputs on the form come in step 3.)
+- **Open packs:** `OpenPacksAction` (`OPN-` numbers, `repack_out` / `repack_in` movements, cost carried over, weighed amount kept, lot/expiry carried over, loose reference cost updated). GRN line "Open now · weighed" runs it on posting, so the PO is still fully received. New screen Inventory → Open packs (permission `inventory.adjust`).
+- Tests: `tests/Feature/Catalog/LoosePricingTest.php`, `tests/Feature/Inventory/PackOpeningTest.php` (23 new). Full suite 472 passing · Larastan 0 errors · Pint clean.
+- Next: step 3 (tier price inputs on the product form, gram entry at the counter) once the owner confirms what unit "Price for grams" is in; step 4 importer.
+
+### 2026-10-06: Real-world pricing plan (plan only, no code changes)
+- Owner's rules: every seed packet size is its own product; sealed fertilizer bottles/packets are their own products; loose fertilizer has two rates ("price for grams" for 0–999 g, "price for kg" for 1 kg and above); wholesale price for a few bulk-buying customers; every price column is optional.
+- Plan: `products.sold_loose`, `product_prices.min_qty` (quantity tiers in base units), wholesale falls back to retail, `sale_items.price_list_id`, product form pricing section, gram entry at the counter, importer that reads the owner's sheet layout (continuation rows → separate products) and no longer works out proportional unit prices.
+- Waiting on: what unit the owner's "Price for grams" number is in (per g / per 100 g / per kg).
+- Correction from the owner: a full bag (Urea 50kg) is its own sealed product, never a unit of the loose product. Loose products are sold only by weight (no bag sale price). Plan updated: a bag unit on a loose product is for purchasing only; new "Open a bag" stock action (bag product −1 → loose product +50 kg) if the shop fills loose stock from sealed bags (to confirm).
+- Owner confirmed: when new stock arrives they split it (some bags stay sealed, some are opened and weighed into loose stock); if loose runs out first they open a sealed bag later. Plan: one "Open packs" stock action (`pack_openings` table, `repack_out`/`repack_in` movements, cost carried over) used in both places: an "Open now" field on the GRN line and a standalone screen. Sealed product stores `opens_into_product_id` + `opens_into_qty`; the weighed kg is entered (spillage/over-weight recorded).
+
+### 2026-10-06: Owner's price sheet analysed (no code changes)
+- Explained how pricing works now: `product_prices` (product × unit × price list, insert-only history), tax-inclusive prices, minimum-margin guard, variants share the parent's price.
+- Read the owner's `Documents\Citizens Products Price.xlsx` (seeds, 4 products). Each pack size (10g/50g/100g/250g) has its **own cost, selling price and reorder level**, and prices are not proportional to weight (10g Rs.120 vs 100g Rs.530). Selling price ≈ cost × 1.5–1.67.
+- Gaps found: no per-variant price/cost/reorder level (`product_prices.variant_id` unused); the importer has no variant column, sets `variants => []` and works out other unit prices proportionally. Questions for the owner listed in the chat (loose kg/gram pricing, wholesale, 250g rows with no price, duplicate "Okra" names).
+
+### 2026-10-02: Opening inventory Excel sheet for the owner
+- New client deliverable: `docs/client-deliverables/CITIZENS-Opening-Inventory.xlsx` for the owner to list the shop's goods before handover. Sheet 1 **Products** has 1,000 formatted entry rows: Name (English), Name SI (Sinhala), Aliases, Category, Brand, Base Unit, Sale Units, Default Sale Unit, Opening Stock, Cost (buying), Retail Price (selling), Wholesale Price, Reorder Level. Required headings are red; each heading has a hover note. Category and unit drop-downs come from the **Lists** sheet (the seeded categories/units, warning-only so new ones can be typed); number cells reject text/negatives. **How to fill** sheet explains each column and shows 4 examples (bag-only Urea, kg+bag MOP, tyre, herbicide).
+- Headings are Title Case versions of the import keys (`Name SI` → `name_si`), so the filled file uploads directly through Products → Import. Verified with `ProductImporter::read()` + `check()`: all 4 example rows pass; the blank file reads 0 rows. Generator script kept in the session scratchpad only.
+- No application code changed.
+
+### 2026-09-28: Branded client PDF of the user guide
+- New client deliverable: `docs/client-deliverables/CITIZENS-Agro-POS-User-Guide.pdf` — a 26-page, WorthBe-branded PDF edition of the user guide, written up in fuller, client-facing prose (cover page, document-information page, hyperlinked table of contents, 17 chapters in 6 parts, page-numbered footer on every page). Built from the WorthBe logo (`Media/WorthBe Fb logo.png`) with the cover addressed to "CITIZENS Agro, D.S. Senanayake Street, Ampara" (corrected the street name's spelling from the request). Built with a throwaway Puppeteer + Chrome + pdf-lib pipeline in the session scratchpad (not added to the repo); only the finished PDF was kept. Source content mirrors `USER_GUIDE.md` but is not generated from it, so the two should be kept in sync by hand if either changes.
+- **Noticed:** Chromium's `printToPDF` header/footer templates mis-place the top margin specifically on pages produced by pushing a tall element (e.g. a callout box) whole onto the next page, causing the running header to collide with the first line of body content. Worked around by dropping the running header and keeping only the footer (which was never affected) — the page still carries the WorthBe cover, part/chapter labels and footer branding throughout.
+- No application code changed.
+
+### 2026-09-28: User guide written
+- New `docs/USER_GUIDE.md`: the whole system for Owner, Manager and Sales Staff: roles, sign-in, menu, go-live order, adding products (form tabs and Excel import columns), every way stock moves (opening stock, GRN, sale, returns, adjustments with the Rs. 10,000 approval, stocktake steps), purchasing (PO → GRN → return → payment), a POS day (open drawer, billing keys, settle, void, close, handover), customers/credit, finance, HR/payroll, reports, administration, document numbers and statuses, scheduled jobs, common problems.
+- No code changed. The Sinhala 1-page quick guides per role are still to write.
 
 ### 2026-09-26: Phase 7 built (Reports, Dashboard, Go-live)
 - **Reports page** (menu → Reports): one generic report screen (filter bar with date range and quick periods → summary tiles → table with totals → Excel / PDF). 29 reports: *Sales* daily summary / Z report, by item, category, brand, counter, staff, customer, hour; discounts given; settlement waiting time. *Loss prevention* removed items & voids by counter, removed items & cleared bills (detail), reprints, discounts above limit. *Profit* by item, category, day (FIFO cost). *Inventory* stock on hand & valuation, stock by batch, movement history, expiry, dead stock, reorder list, adjustment & stocktake variance. *Purchasing* by supplier, by item, open orders, supplier ageing. *Customers* receivables ageing, credit sales. *Cash & finance* drawer sessions & variances, handover history, expenses. *Audit* price change history, user sign-ins. The existing P&L, trial balance, balance sheet, cash / bank book, cheque register, HR reports, activity and print logs are linked from the same page. Each report checks its own permission.

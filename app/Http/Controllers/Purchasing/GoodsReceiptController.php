@@ -107,7 +107,7 @@ class GoodsReceiptController extends Controller
     {
         $this->authorize('view', $goodsReceipt);
 
-        $goodsReceipt->load(['supplier', 'purchaseOrder', 'receiver', 'lines.product', 'lines.variant', 'lines.unit', 'lines.batch']);
+        $goodsReceipt->load(['supplier', 'purchaseOrder', 'receiver', 'lines.product.baseUnit', 'lines.product.opensInto', 'lines.variant', 'lines.unit', 'lines.batch', 'packOpenings.looseProduct.baseUnit']);
 
         return view('purchasing.goods-receipts.show', ['receipt' => $goodsReceipt]);
     }
@@ -123,6 +123,8 @@ class GoodsReceiptController extends Controller
             'unit_id' => $line->unit_id,
             'qty' => $line->qty,
             'free_qty' => (float) $line->free_qty ? $line->free_qty : '',
+            'open_packs' => (float) $line->open_packs ? $line->open_packs : '',
+            'open_weighed_qty' => $line->open_weighed_qty ?? '',
             'unit_cost' => $line->unit_cost,
             'lot_no' => $line->lot_no,
             'mfg_date' => $line->mfg_date?->toDateString(),

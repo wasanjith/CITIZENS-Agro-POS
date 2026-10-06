@@ -64,6 +64,7 @@ class HoldCartAction
                     'product_id' => $line['product_id'],
                     'variant_id' => $line['variant_id'],
                     'unit_id' => $line['unit_id'],
+                    'price_list_id' => $line['price_list_id'],
                     'qty' => $line['qty'],
                     'factor' => $line['factor'],
                     'base_qty' => $line['base_qty'],

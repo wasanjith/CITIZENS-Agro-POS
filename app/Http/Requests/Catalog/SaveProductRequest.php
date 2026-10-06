@@ -41,6 +41,9 @@ class SaveProductRequest extends FormRequest
             'category_id' => ['required', 'integer', Rule::exists('categories', 'id')->whereNull('deleted_at')],
             'brand_id' => ['nullable', 'integer', Rule::exists('brands', 'id')->whereNull('deleted_at')],
             'base_unit_id' => ['required', 'integer', 'exists:units,id'],
+            'sold_loose' => ['boolean'],
+            'opens_into_product_id' => ['nullable', 'integer', Rule::exists('products', 'id')->whereNull('deleted_at')],
+            'opens_into_qty' => ['nullable', 'required_with:opens_into_product_id', 'numeric', 'gt:0', 'max:99999999999', 'decimal:0,3'],
             'tax_id' => ['nullable', 'integer', 'exists:taxes,id'],
             'is_active' => ['boolean'],
             'track_batches' => ['boolean'],
@@ -63,6 +66,7 @@ class SaveProductRequest extends FormRequest
             'prices' => ['array'],
             'prices.*.unit_id' => ['required', 'integer'],
             'prices.*.price_list_id' => ['required', 'integer', 'exists:price_lists,id'],
+            'prices.*.min_qty' => ['nullable', 'numeric', 'min:0', 'max:99999999999', 'decimal:0,3'],
             'prices.*.price' => ['nullable', 'numeric', 'min:0', 'max:9999999999999', 'decimal:0,2'],
 
             'variants' => ['array', 'max:100'],
@@ -77,11 +81,22 @@ class SaveProductRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'opens_into_qty.required_with' => 'Enter how much of the loose product one pack holds (e.g. 50 for a 50 kg bag).',
+        ];
+    }
+
+    /**
      * @return array<int, Closure(Validator): void>
      */
     public function after(): array
     {
         return [
+            fn (Validator $validator) => $this->validateLoosePricing($validator),
             function (Validator $validator): void {
                 $product = $this->route('product');
                 $productId = $product instanceof Product ? $product->id : null;
@@ -100,6 +115,54 @@ class SaveProductRequest extends FormRequest
                 }
             },
         ];
+    }
+
+    /**
+     * Quantity tiers only for loose products; a pack opens into a loose product, never itself.
+     */
+    private function validateLoosePricing(Validator $validator): void
+    {
+        $product = $this->route('product');
+        $soldLoose = $this->boolean('sold_loose');
+        $seen = [];
+
+        foreach ((array) $this->input('prices', []) as $index => $row) {
+            $minQty = is_numeric($row['min_qty'] ?? null) ? (float) $row['min_qty'] : 0.0;
+
+            if ($minQty > 0 && ! $soldLoose && filled($row['price'] ?? null)) {
+                $validator->errors()->add("prices.{$index}.min_qty", 'Quantity prices are only for products sold loose.');
+            }
+
+            $key = ($row['price_list_id'] ?? '').':'.($row['unit_id'] ?? '').':'.$minQty;
+
+            if (isset($seen[$key])) {
+                $validator->errors()->add("prices.{$index}.min_qty", 'The same price is entered twice.');
+            }
+
+            $seen[$key] = true;
+        }
+
+        $targetId = $this->input('opens_into_product_id');
+
+        if ($targetId === null) {
+            return;
+        }
+
+        $target = Product::query()->find((int) $targetId);
+
+        if ($product instanceof Product && $target?->id === $product->id) {
+            $validator->errors()->add('opens_into_product_id', 'A product cannot be opened into itself.');
+        } elseif ($target !== null && ! $target->sold_loose) {
+            $validator->errors()->add('opens_into_product_id', "{$target->name} is not sold loose. Tick \"Sold loose\" on it first.");
+        }
+
+        if ($soldLoose) {
+            $validator->errors()->add('opens_into_product_id', 'A loose product cannot be opened into another product. Only sealed packs can.');
+        }
+
+        if ((array) $this->input('variants', []) !== []) {
+            $validator->errors()->add('opens_into_product_id', 'A product with variants cannot be opened into a loose product.');
+        }
     }
 
     protected function prepareForValidation(): void
@@ -122,6 +185,9 @@ class SaveProductRequest extends FormRequest
             'is_active' => $this->boolean('is_active'),
             'track_batches' => $this->boolean('track_batches'),
             'track_expiry' => $this->boolean('track_expiry'),
+            'sold_loose' => $this->boolean('sold_loose'),
+            'opens_into_product_id' => $this->input('opens_into_product_id') ?: null,
+            'opens_into_qty' => $this->input('opens_into_product_id') ? ($this->input('opens_into_qty') ?: null) : null,
             'reorder_level' => $this->input('reorder_level') ?: 0,
             'reorder_qty' => $this->input('reorder_qty') ?: 0,
             'units' => $units,

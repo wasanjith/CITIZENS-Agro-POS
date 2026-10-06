@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $product_id
  * @property int|null $variant_id
  * @property int $unit_id
+ * @property int|null $price_list_id list the unit price came from (retail when the customer's list has none)
  * @property string $qty
  * @property string $factor
  * @property string $base_qty
@@ -38,7 +39,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $approval_request_id
  */
 #[Fillable([
-    'sale_id', 'line_no', 'product_id', 'variant_id', 'unit_id', 'qty', 'factor', 'base_qty',
+    'sale_id', 'line_no', 'product_id', 'variant_id', 'unit_id', 'price_list_id', 'qty', 'factor', 'base_qty',
     'unit_price', 'discount_amount', 'tax_amount', 'line_total',
     'short_code_snapshot', 'name_snapshot', 'name_si_snapshot', 'unit_snapshot', 'unit_si_snapshot',
     'reservations', 'approval_request_id',
@@ -58,6 +59,7 @@ class SaleItem extends Model
             'product_id' => 'integer',
             'variant_id' => 'integer',
             'unit_id' => 'integer',
+            'price_list_id' => 'integer',
             'qty' => 'decimal:3',
             'factor' => 'decimal:3',
             'base_qty' => 'decimal:3',

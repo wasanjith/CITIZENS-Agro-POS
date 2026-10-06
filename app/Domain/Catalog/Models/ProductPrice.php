@@ -14,19 +14,24 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
- * One price for a product × unit × price list. Rows are never edited: a price
- * change inserts a new row, so the table is also the price history.
+ * One price for a product × unit × price list × quantity tier. Rows are never edited:
+ * a price change inserts a new row, so the table is also the price history. A row
+ * with a null price removes the price from that moment on.
+ *
+ * Tiers (min_qty, in base units) only apply to products sold loose: Urea loose has
+ * one rate from 0 kg (under 1 kg) and a cheaper rate from 1 kg.
  *
  * @property int $id
  * @property int $product_id
  * @property int|null $variant_id
  * @property int $unit_id
+ * @property string $min_qty
  * @property int $price_list_id
- * @property string $price
+ * @property string|null $price
  * @property Carbon $effective_from
  * @property int|null $created_by
  */
-#[Fillable(['product_id', 'variant_id', 'unit_id', 'price_list_id', 'price', 'effective_from', 'created_by'])]
+#[Fillable(['product_id', 'variant_id', 'unit_id', 'min_qty', 'price_list_id', 'price', 'effective_from', 'created_by'])]
 #[UseFactory(ProductPriceFactory::class)]
 class ProductPrice extends Model
 {
@@ -42,6 +47,7 @@ class ProductPrice extends Model
             'product_id' => 'integer',
             'variant_id' => 'integer',
             'unit_id' => 'integer',
+            'min_qty' => 'decimal:3',
             'price_list_id' => 'integer',
             'price' => 'decimal:2',
             'effective_from' => 'datetime',
@@ -51,7 +57,7 @@ class ProductPrice extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['product_id', 'variant_id', 'unit_id', 'price_list_id', 'price', 'effective_from']);
+            ->logOnly(['product_id', 'variant_id', 'unit_id', 'min_qty', 'price_list_id', 'price', 'effective_from']);
     }
 
     /**

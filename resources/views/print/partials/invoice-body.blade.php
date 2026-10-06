@@ -55,7 +55,7 @@
 @foreach ($invoice['items'] as $item)
     <div class="item-name">{{ $primary === 'si' ? ($item['name_si'] ?: $item['name']) : $item['name'] }}</div>
     <div class="row item-line">
-        <span class="num">{{ $qty($item['qty']) }} {{ $primary === 'si' ? $item['unit_si'] : $item['unit'] }} × {{ $money($item['price']) }}</span>
+        <span class="num">{{ $qty($item['qty']) }} {{ $primary === 'si' ? $item['unit_si'] : $item['unit'] }}@if (($item['unit'] ?? '') === 'kg' && $item['qty'] > 0 && $item['qty'] < 1) ({{ round($item['qty'] * 1000) }} g)@endif × {{ $money($item['price']) }}</span>
         <span class="num">{{ $money($item['total'] + ($item['discount'] ?? 0)) }}</span>
     </div>
     @if (($item['discount'] ?? 0) > 0)

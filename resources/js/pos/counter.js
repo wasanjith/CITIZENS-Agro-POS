@@ -293,7 +293,7 @@ export default function posCounter(config) {
                 this.error = `${item.name} has no sale unit.`;
                 return;
             }
-            if (unit.price === null || unit.price === undefined) {
+            if ((unit.price === null || unit.price === undefined) && !(unit.tiers ?? []).length) {
                 this.error = `${item.name} has no price per ${unit.name}. Ask the manager to set it.`;
                 return;
             }
@@ -302,7 +302,7 @@ export default function posCounter(config) {
             const existing = this.cart.lines.findIndex((line) => line.product_id === item.id && (line.variant_id ?? null) === (item.variant_id ?? null) && line.unit_id === unit.id);
 
             if (existing >= 0) {
-                this.cart.lines[existing].qty = qty(Number(this.cart.lines[existing].qty) + addQty);
+                this.cart.lines[existing].qty = qty(this.lineQty(this.cart.lines[existing]) + addQty);
                 this.selected = existing;
             } else {
                 this.cart.lines.push({
@@ -316,7 +316,9 @@ export default function posCounter(config) {
                     short_code: item.short_code,
                     name: item.name,
                     name_si: item.name_si,
-                    units: (item.units ?? []).filter((u) => u.price !== null).map((u) => ({ id: u.id, symbol: u.symbol, name: u.name, factor: u.factor, allows_decimal: u.allows_decimal, price: u.price })),
+                    units: (item.units ?? [])
+                        .filter((u) => u.price !== null || (u.tiers ?? []).length)
+                        .map((u) => ({ id: u.id, symbol: u.symbol, name: u.name, factor: u.factor, allows_decimal: u.allows_decimal, price: u.price, tiers: u.tiers ?? [] })),
                     stock: item.stock,
                     expiry: item.expiry ?? null,
                 });
@@ -340,7 +342,7 @@ export default function posCounter(config) {
         step(index, direction) {
             const line = this.cart.lines[index];
             if (!line) return;
-            const next = Number(line.qty) + direction;
+            const next = this.lineQty(line) + direction;
             if (next <= 0) {
                 this.remove(index);
                 return;
@@ -364,8 +366,66 @@ export default function posCounter(config) {
             return this.server?.lines?.find((row) => row.key === line.key) ?? null;
         },
 
+        /**
+         * Quantity typed on a line: "1.5", or grams of a kg product ("750g" or "750 g" → 0.75).
+         * NaN when it cannot be read.
+         */
+        parseQty(line, text) {
+            const match = String(text ?? '').trim().toLowerCase().match(/^(\d*\.?\d+)\s*(g|gm|kg)?$/);
+            if (!match) return NaN;
+            const number = Number(match[1]);
+            if (!match[2] || match[2] === 'kg') return number;
+            return this.unitOf(line).symbol === 'kg' ? number / 1000 : NaN;
+        },
+
+        lineQty(line) {
+            const value = this.parseQty(line, line.qty);
+            return Number.isFinite(value) ? value : 0;
+        },
+
+        /** Tidy the quantity box after grams were typed ("750g" → "0.75"). */
+        normaliseQty(line) {
+            const value = this.parseQty(line, line.qty);
+            if (Number.isFinite(value) && value > 0 && String(line.qty) !== qty(value)) {
+                line.qty = qty(value);
+                this.changed();
+            }
+        },
+
+        /** "750 g" under the quantity of a kg line below 1 kg. */
+        gramsText(line) {
+            const value = this.lineQty(line);
+            return this.unitOf(line).symbol === 'kg' && value > 0 && value < 1 ? `${Math.round(value * 1000)} g` : '';
+        },
+
+        /** The unit's rate for the line's weight (loose goods: under 1 kg, from 1 kg), as the server prices it. */
+        lineTier(line) {
+            const unit = this.unitOf(line);
+            const baseQty = this.lineQty(line) * Number(unit.factor || 1);
+            return [...(unit.tiers ?? [])].reverse().find((tier) => Number(tier.min_qty) <= baseQty + 1e-9) ?? null;
+        },
+
+        unitPrice(line) {
+            return Number(this.lineTier(line)?.price ?? this.unitOf(line).price ?? 0);
+        },
+
+        /** "from 1 kg: 250.00" for a search result whose unit has quantity rates. */
+        tiersText(unit) {
+            return (unit?.tiers ?? []).slice(1).map((tier) => `from ${qty(tier.min_qty)} ${unit.symbol}: ${money(tier.price)}`).join(' · ');
+        },
+
+        /** Which rate applies, when the unit has more than one. */
+        rateText(line) {
+            const tiers = this.unitOf(line).tiers ?? [];
+            const tier = this.lineTier(line);
+            if (tiers.length < 2 || !tier) return '';
+            const index = tiers.indexOf(tier);
+            const symbol = this.unitOf(line).symbol;
+            return index === 0 ? `under ${qty(tiers[1].min_qty)} ${symbol}` : `from ${qty(tier.min_qty)} ${symbol}`;
+        },
+
         lineGross(line) {
-            return Math.round(Number(line.qty || 0) * Number(this.unitOf(line).price || 0) * 100) / 100;
+            return Math.round(this.lineQty(line) * this.unitPrice(line) * 100) / 100;
         },
 
         lineTotal(line) {
@@ -467,7 +527,7 @@ export default function posCounter(config) {
                     product_id: line.product_id,
                     variant_id: line.variant_id,
                     unit_id: line.unit_id,
-                    qty: line.qty,
+                    qty: Number.isFinite(this.parseQty(line, line.qty)) ? qty(this.parseQty(line, line.qty)) : line.qty,
                     discount: line.discount === '' ? null : line.discount,
                     approval_request_id: line.approval_request_id,
                 })),
@@ -481,6 +541,11 @@ export default function posCounter(config) {
             try {
                 const data = await api(this.config.urls.sync, { method: 'POST', body: this.payload() });
                 this.server = data.cart;
+                // The server's prices win: a new price list or a price change since the item was added.
+                (data.cart?.lines ?? []).forEach((row) => {
+                    const line = this.cart.lines.find((item) => item.key === row.key);
+                    if (line && Array.isArray(row.units) && row.units.length) line.units = row.units;
+                });
                 this.syncError = null;
             } catch (error) {
                 this.syncError = error instanceof ApiError && error.status === 422 ? error.first : 'Not connected to the server. The bill is kept on this screen.';

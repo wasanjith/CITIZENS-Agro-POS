@@ -3,6 +3,7 @@
 namespace App\Domain\Reports\Reports\Audit;
 
 use App\Domain\Catalog\Models\PriceList;
+use App\Domain\Inventory\Support\Qty;
 use App\Domain\Reports\Report;
 use App\Domain\Reports\Services\ReportLookups;
 use App\Domain\Reports\Support\Column;
@@ -85,27 +86,27 @@ class PriceChangesReport extends Report
             ->when($search, fn ($query) => $query->where(fn ($inner) => $inner->where('p.short_code', $search)->orWhere('p.name', 'like', '%'.$search.'%')))
             ->orderBy('pp.effective_from')
             ->orderBy('pp.id')
-            ->selectRaw('pp.id, pp.product_id, pp.effective_from, pp.price, pp.created_by, p.short_code, p.name, u.name AS unit, l.name AS list,
+            ->selectRaw('pp.id, pp.product_id, pp.effective_from, pp.price, pp.min_qty, pp.created_by, p.short_code, p.name, u.name AS unit, u.symbol AS unit_symbol, l.name AS list,
                 (SELECT old.price FROM product_prices old
                   WHERE old.product_id = pp.product_id AND old.price_list_id = pp.price_list_id AND old.unit_id = pp.unit_id
-                    AND old.variant_id <=> pp.variant_id AND (old.effective_from < pp.effective_from OR (old.effective_from = pp.effective_from AND old.id < pp.id))
+                    AND old.min_qty = pp.min_qty AND old.variant_id <=> pp.variant_id AND (old.effective_from < pp.effective_from OR (old.effective_from = pp.effective_from AND old.id < pp.id))
                   ORDER BY old.effective_from DESC, old.id DESC LIMIT 1) AS old_price')
             ->get()
             ->map(fn (object $row) => [
                 'at' => $row->effective_from,
                 'code' => $row->short_code,
                 'name' => $row->name,
-                'unit' => $row->unit,
+                'unit' => BigDecimal::of((string) $row->min_qty)->isPositive() ? "{$row->unit} (from ".Qty::format((string) $row->min_qty)." {$row->unit_symbol})" : $row->unit,
                 'list' => $row->list,
                 'old' => $row->old_price,
                 'new' => $row->price,
-                'change' => $row->old_price !== null ? (string) Money::percent(BigDecimal::of($row->price)->minus($row->old_price), Money::of($row->old_price)) : null,
+                'change' => $row->old_price !== null && $row->price !== null ? (string) Money::percent(BigDecimal::of($row->price)->minus($row->old_price), Money::of($row->old_price)) : null,
                 'user' => $this->lookups->user($row->created_by !== null ? (int) $row->created_by : null),
                 '_url' => route('catalog.products.show', $row->product_id),
-                '_alert' => $row->old_price !== null && BigDecimal::of($row->price)->isLessThan($row->old_price),
+                '_alert' => $row->old_price !== null && $row->price !== null && BigDecimal::of($row->price)->isLessThan($row->old_price),
             ])
             ->all();
 
-        return new ReportResult($rows, notes: ['An empty old price is the first price set for that item, unit and list. Red: the price went down.']);
+        return new ReportResult($rows, notes: ['An empty old price is the first price set for that item, unit and list. An empty new price means the price was removed. Red: the price went down.']);
     }
 }

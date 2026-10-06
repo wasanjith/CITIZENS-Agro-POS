@@ -16,6 +16,7 @@ use App\Domain\Catalog\Services\ShortCodeGenerator;
 use App\Domain\Inventory\Models\StockLevel;
 use App\Domain\Inventory\Models\StockMovement;
 use App\Domain\Inventory\Services\StockAlerts;
+use App\Domain\Inventory\Support\Qty;
 use App\Http\Controllers\Concerns\HasListQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Catalog\SaveProductRequest;
@@ -85,12 +86,12 @@ class ProductController extends Controller
     {
         $this->authorize('view', $product);
 
-        $product->load(['category.parent.parent', 'brand', 'baseUnit', 'tax', 'units.unit', 'creator', 'variants' => fn ($query) => $query->withTrashed()]);
+        $product->load(['category.parent.parent', 'brand', 'baseUnit', 'tax', 'units.unit', 'creator', 'opensInto.baseUnit', 'variants' => fn ($query) => $query->withTrashed()]);
 
         return view('catalog.products.show', [
             'product' => $product,
             'priceLists' => PriceList::query()->orderBy('id')->get(),
-            'prices' => $priceBook->forProduct($product->id),
+            'prices' => $priceBook->tiersForProduct($product->id),
             'priceHistory' => $product->prices()->with(['unit', 'priceList', 'creator'])->latest('effective_from')->latest('id')->limit(50)->get(),
             'openingStock' => $product->openingStock()->whereNull('posted_at')->get(),
             'stockLevels' => StockLevel::query()
@@ -146,7 +147,7 @@ class ProductController extends Controller
 
         $product->load(['units', 'variants']);
 
-        return view('catalog.products.form', $this->formData($product, $priceBook->forProduct($product->id)));
+        return view('catalog.products.form', $this->formData($product, $priceBook->tiersForProduct($product->id)));
     }
 
     public function update(SaveProductRequest $request, Product $product, SaveProductAction $saveProduct): RedirectResponse
@@ -184,7 +185,7 @@ class ProductController extends Controller
     }
 
     /**
-     * @param  array<int, array<int, string>>  $prices  price_list_id => [unit_id => price]
+     * @param  array<int, array<int, array<string, string>>>  $prices  price_list_id => [unit_id => [min_qty => price]]
      * @return array<string, mixed>
      */
     private function formData(Product $product, array $prices): array
@@ -223,12 +224,24 @@ class ProductController extends Controller
             'brands' => Brand::query()->active()->orderBy('name')->pluck('name', 'id'),
             'units' => $units,
             'taxes' => Tax::query()->orderBy('name')->get()->mapWithKeys(fn (Tax $tax) => [$tax->id => $tax->label()]),
+            'looseProducts' => Product::query()->where('sold_loose', true)->whereKeyNot($product->id ?? 0)->orderBy('name')->pluck('name', 'id'),
             'priceLists' => PriceList::query()->orderBy('id')->get(),
             'unitRows' => old('units', $unitRows),
             'variantRows' => old('variants', $variantRows),
             'attributeRows' => old('attribute_rows', $attributeRows),
-            'priceMatrix' => old('prices') ? collect(old('prices'))->mapWithKeys(fn ($row) => ["{$row['price_list_id']}:{$row['unit_id']}" => $row['price']])->all()
-                : collect($prices)->flatMap(fn ($byUnit, $listId) => collect($byUnit)->mapWithKeys(fn ($price, $unitId) => ["{$listId}:{$unitId}" => $price]))->all(),
+            // "list:unit" = any-quantity price, "list:unit@1" = price from 1 base unit (loose goods).
+            'priceMatrix' => old('prices') ? collect(old('prices'))->mapWithKeys(fn ($row) => [self::priceKey($row['price_list_id'], $row['unit_id'], $row['min_qty'] ?? '0') => $row['price']])->all()
+                : collect($prices)->flatMap(fn ($byUnit, $listId) => collect($byUnit)->flatMap(fn ($tiers, $unitId) => collect($tiers)->mapWithKeys(fn ($price, $minQty) => [self::priceKey($listId, $unitId, (string) $minQty) => $price])))->all(),
         ];
+    }
+
+    /**
+     * Key of one price box on the product form.
+     */
+    private static function priceKey(int|string $listId, int|string $unitId, string $minQty): string
+    {
+        $tier = Qty::format($minQty === '' ? '0' : $minQty);
+
+        return $tier === '0' ? "{$listId}:{$unitId}" : "{$listId}:{$unitId}@{$tier}";
     }
 }
