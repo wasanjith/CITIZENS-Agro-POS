@@ -65,6 +65,7 @@ class ProductImportController extends Controller
             'fileName' => $request->file('file')->getClientOriginalName(),
             'valid' => $result['valid'],
             'rowErrors' => $result['errors'],
+            'rowWarnings' => $result['warnings'],
             'missingColumns' => $result['missing_columns'],
         ]);
     }

@@ -199,8 +199,8 @@ test('the product export leaves out cost for sales staff', function () {
     $this->actingAs(userWithRole(Role::SalesStaff))->get(route('catalog.products.export'))->assertOk()->assertDownload();
 
     $query = Product::query();
-    expect((new ProductsExport($query, withCost: false))->headings())->not->toContain('cost')
-        ->and((new ProductsExport($query, withCost: true))->headings())->toContain('cost');
+    expect((new ProductsExport($query, withCost: false))->headings())->not->toContain('Cost')
+        ->and((new ProductsExport($query, withCost: true))->headings())->toContain('Cost');
 });
 
 test('the product list filters by category including sub-categories', function () {

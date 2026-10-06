@@ -23,6 +23,7 @@ class CatalogSeeder extends Seeder
             ['g', 'ග්‍රෑම්', 'g', false],
             ['bag', 'මල්ල', 'bag', false],
             ['packet', 'පැකට්', 'pkt', false],
+            ['bottle', 'බෝතල්', 'btl', false],
             ['piece', 'කෑලි', 'pc', false],
             ['pair', 'යුගල', 'pair', false],
             ['set', 'කට්ටල', 'set', false],

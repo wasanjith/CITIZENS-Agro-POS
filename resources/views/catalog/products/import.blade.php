@@ -9,6 +9,13 @@
         <div class="space-y-6 lg:col-span-2">
             <x-ui.card title="1. Download the template">
                 <p class="text-sm text-gray-600">Fill in one product per row. Keep the first row (the column names) as it is.</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-600">
+                    <li><strong>Seed packets and other sealed packs:</strong> each pack size is its own product. Write the name once, then one row per pack size with only Pack Size, Cost, Selling Price and Reorder Level.</li>
+                    <li><strong>Loose fertilizer:</strong> fill Price for grams (per kg, for less than 1 kg) and Price for Kg's (per kg, from 1 kg). Base unit kg.</li>
+                    <li><strong>Sealed bags that are sometimes opened:</strong> put the loose product's name in Opens Into.</li>
+                    <li>Every price is optional. Wholesale customers pay the Selling Price where there is no Whole Sale Price.</li>
+                </ul>
+                <p class="mt-2 text-sm text-gray-600">The owner's own price sheet (Product Name, Product Varients, Selling Price …) can be uploaded as it is.</p>
                 <x-ui.button variant="secondary" class="mt-3" :href="route('catalog.products.import.template')">Download template (.xlsx)</x-ui.button>
             </x-ui.card>
 
@@ -28,10 +35,10 @@
 
         <x-ui.card title="Columns">
             <dl class="space-y-3 text-sm">
-                @foreach ($columns as $column => $description)
+                @foreach ($columns as $column)
                     <div>
-                        <dt class="font-mono text-xs font-semibold text-gray-800">{{ $column }}</dt>
-                        <dd class="text-gray-600">{{ $description }}</dd>
+                        <dt class="text-xs font-semibold text-gray-800">{{ $column['heading'] }}</dt>
+                        <dd class="text-gray-600">{{ $column['description'] }}</dd>
                     </div>
                 @endforeach
             </dl>

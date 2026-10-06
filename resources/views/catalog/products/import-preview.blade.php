@@ -12,9 +12,10 @@
             The file is missing the column(s) <strong>{{ implode(', ', $missingColumns) }}</strong>. Start from the template and keep its first row.
         </x-ui.alert>
     @else
-        <div class="mb-6 grid gap-4 sm:grid-cols-2">
+        <div class="mb-6 grid gap-4 sm:grid-cols-3">
             <x-ui.stat-tile label="Rows ready to import" :value="count($valid)" />
             <x-ui.stat-tile label="Rows with problems" :value="count($rowErrors)" />
+            <x-ui.stat-tile label="Rows with notes" :value="count($rowWarnings)" />
         </div>
 
         @if ($rowErrors)
@@ -57,8 +58,10 @@
                         <th>Code</th>
                         <th>Name</th>
                         <th>Category</th>
-                        <th>Units</th>
+                        <th>Unit</th>
+                        <th>Prices</th>
                         <th>Opening stock</th>
+                        <th>Notes</th>
                     </x-slot:head>
                     @foreach (array_slice($valid, 0, 200, true) as $row => $product)
                         <tr>
@@ -71,8 +74,18 @@
                                 @endif
                             </td>
                             <td class="text-gray-600">{{ $product['category_path'] }}</td>
-                            <td class="text-gray-600">{{ $product['base_unit_name'] }}@if (count($product['units']) > 1) + {{ count($product['units']) - 1 }} more @endif</td>
+                            <td class="text-gray-600">
+                                {{ $product['base_unit_name'] }}@if (count($product['units']) > 1) + {{ count($product['units']) - 1 }} more @endif
+                                @if ($product['sold_loose'])<x-ui.badge color="blue">loose</x-ui.badge>@endif
+                                @if ($product['opens_into_text'])<span class="block text-xs">opens into {{ $product['opens_into_text'] }} ({{ \App\Domain\Inventory\Support\Qty::format($product['opens_into_qty']) }})</span>@endif
+                            </td>
+                            <td class="text-gray-600">{{ $product['price_text'] ?: '—' }}</td>
                             <td class="tabular text-gray-600">{{ $product['opening_stock']['qty'] ?? '—' }}</td>
+                            <td>
+                                @foreach ($rowWarnings[$row] ?? [] as $warning)
+                                    <p class="text-xs text-amber-800">{{ $warning }}</p>
+                                @endforeach
+                            </td>
                         </tr>
                     @endforeach
                 </x-ui.table>

@@ -11,7 +11,7 @@
 |---|---|
 | **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
 | **Last updated** | 2026-10-06 |
-| **Tests** | 483 Pest tests, all passing (Meilisearch was running, so none skipped). |
+| **Tests** | 488 Pest tests, all passing (Meilisearch was running, so none skipped). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
 | **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
@@ -96,6 +96,16 @@
 ## Log
 
 Newest first.
+
+### 2026-10-06: Real-world pricing, step 4 built (importer reads the owner's sheet)
+- **Columns:** template headings now follow the owner's sheet (Product Name, Sinhala Name, Pack Size, Selling Price, Whole Sale Price, Price for Kg's (per kg), Price for grams (per kg) …) plus Opens Into / Loose Qty Per Pack. The owner's own headings ("Product Varients", "Whole Sale Price", "Price for Kg's", "Price for grams") and the old snake_case ones are read too (`ProductImportColumns::key()`).
+- **Pack sizes:** each pack size is its own product ("Okra" + "10g packet" → "Okra 10g packet"); a row with only a pack size continues the product above (name, Sinhala name, category, brand, units). A pack counted in g/kg/ml becomes packet (or bag/bottle from the pack text), with a note.
+- **Loose rows:** Price for grams → price per kg under 1 kg, Price for Kg's → from 1 kg; only one of them → one rate. Errors when the grams price looks per 100 g / per gram (< half the kg price), when a row is both pack and loose, or the base unit can't hold decimals (g is switched to kg with a note).
+- **Prices:** only what the file gives (no more proportional prices for other units). No Selling Price → imported with a note "cannot be billed until a price is set". Wholesale stored as an any-quantity price.
+- **Opens Into:** links a sealed bag to a loose product in the same file or already saved (by name or code); quantity per pack from the column or read from the pack size ("50kg bag" → 50).
+- **Preview:** new "Rows with notes" tile, Prices and Notes columns. **Export** uses the same layout (Cost column only with permission). New unit **bottle** in `CatalogSeeder` (run `php artisan db:seed --class=CatalogSeeder` on the dev/live database).
+- Dry run of `Documents\Citizens Products Price.xlsx` (read-only): 13 products, 0 errors, notes for 4 rows without price and 9 rows whose base unit "grams" became packet.
+- Tests: `ProductImportTest` (5 new; 2 expectations changed on purpose: no proportional kg price, new error wording), `ProductManagementTest` export heading. Full suite 488 passing · Larastan 0 · Pint clean.
 
 ### 2026-10-06: Real-world pricing, step 3 built (loose price inputs, grams at the counter)
 - **Product form:** with "Sold loose" ticked, the base unit gets two price rows per list: "Under 1 kg (price per kg)" and "1 kg and above (price per kg)", each with "= Rs. X per 100 g" under it, so the owner's "price for grams" can be entered whatever unit it is quoted in. Empty box = no price (wholesale falls back to retail). Unticking "Sold loose" removes the quantity prices.
