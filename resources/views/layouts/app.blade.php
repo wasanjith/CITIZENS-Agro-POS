@@ -121,7 +121,7 @@
             </div>
         </header>
 
-        <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <main class="@yield('main_class', 'mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8')">
             <x-ui.flash class="mb-6" />
             @error('attendance')<x-ui.alert type="error" class="mb-6">{{ $message }}</x-ui.alert>@enderror
             @if (session('print_url'))

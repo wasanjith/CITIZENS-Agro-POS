@@ -10,8 +10,8 @@
 | Item | Status |
 |---|---|
 | **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
-| **Last updated** | 2026-10-06 |
-| **Tests** | 490 Pest tests, all passing (Meilisearch was running, so none skipped). |
+| **Last updated** | 2026-10-09 |
+| **Tests** | 492 Pest tests, all passing (Meilisearch was running, so none skipped). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
 | **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
@@ -90,12 +90,36 @@
 
 | 2026-09-26 | **Attendance:** the first PIN sign-in of the day on a shop terminal clocks the employee in; they clock out with the button in the top bar. Late = after the shift start + grace minutes; overtime = minutes after the shift end (from 30 minutes); on a day off or a holiday every minute is overtime. Only the Super Admin corrects attendance (with a reason, audited); the Manager can view it. |
 | 2026-09-26 | **Reports:** a sale counts on the day it was settled (like the books); a return counts on the day it was taken, against the original sale's counter, staff member and customer; a voided sale does not count. Item, category and brand figures share each bill discount across the lines. Reports over 12 months read the nightly summary. Profit reports are Super Admin only; the Manager sees sales and stock reports with cost. |
+| 2026-10-07 | **Owner dashboard** follows the owner's mockup, in the brand green. No sub-dealer split (owner: leave it out). Gross profit shown for today and for this month (owner only). A supplier bill is due its supplier's payment terms after the goods receipt and is "Due soon" within **7 days** (owner). No branch picker or stock transfers (one shop); that tile opens Open packs. |
 | 2026-09-26 | **Payroll:** no-pay = no-pay days × basic ÷ working days; OT = hours × basic × 1.5 ÷ 240; EPF/ETF on basic − no-pay + allowances marked "EPF applies" (not on OT). Approving posts the salaries as owed (Dr Salaries, EPF/ETF expense; Cr Salaries payable, EPF/ETF payable, Staff advances); paying moves the money (drawer, cash at home or bank, one entry per person). An approved payroll can be reopened until someone is paid. Payroll, employees and advances are Super Admin only and can never be handed over. |
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-10-09: Pre-deployment audit (report only, no code changes)
+- Owner: check the whole codebase for bugs and security holes before deployment, and write the findings to a `.md` file.
+- Report: [PRE_DEPLOYMENT_AUDIT.md](PRE_DEPLOYMENT_AUDIT.md). 3 high (production `.env`/`APP_DEBUG`, leftover `public/hot`, no backups scheduled), 5 medium (PIN sign-in skips 2FA, PIN guessable over time at a terminal, any counter can choose the Wholesale price list, adjustment approval limit can be split, discount-approval % uses gross sent by the counter), 10 low. No SQL injection or XSS found; every controller action is authorized.
+- Tests: 492 total, full run 452 passed / 3 failed / 37 skipped (Meilisearch off). The 2 Catalog failures were MySQL 1412 (flaky, pass in isolation); the dashboard test failure matched the in-progress dashboard change and passes now. Larastan 0 errors, `composer audit` clean, `npm audit` 3 in dev-only build tools.
+
+### 2026-10-09: Dashboard made compact (fits one screen)
+- Owner: remove the empty space under the top bar and fit every widget on screen without scrolling.
+- The layout's `<main>` classes can now be overridden per page (`@section('main_class')`); the dashboard uses the full width with small padding.
+- One header line: title, attention chips (the 2FA warning is now a chip) and date / time. Tighter KPI cards (link next to the sub-text), panels with the "View all" arrow in the header, 1-line table rows, a side-by-side donut, and one row of small quick-action tiles (short labels below 1536 px).
+- Checked in headless Chrome on a throwaway DB: no scrolling at 1920×1080, 1600×900 and 1440×900. A 1366×768 laptop scrolls ~120 px; on a phone it stacks in one column with no sideways page scroll.
+
+### 2026-10-07: Owner dashboard rebuilt from the mockup
+- Owner's answers: leave out sub dealers; gross profit today and this month; supplier bills "Due soon" 7 days ahead.
+- `DashboardData`: new month-to-date sales, gross profit (today / month, like the profit reports), today's payments by method, yesterday comparison, open POs, unpaid supplier bills with due status, today's best sellers by quantity, last 5 sales, active item count, and the open drawer's cash summary (opening, cash sales, cash in, cash out, expected). Removed the 30-day top-10 and the System card's queries.
+- New components `x-dashboard.kpi-card / panel / donut / sparkline / quick-action / icon` (inline SVG, no chart library). `dashboard.blade.php` rewritten: 5 KPI cards, 5 summary panels, recent sales / supplier bills / cash summary, quick actions (each shown only with its permission), and an "attention" strip (waiting settlements, approvals, POs to approve, unposted GRNs, overdue bills, cheques, expiring batches, cashier delegation with Revoke).
+- Manager sees sales, stock, purchasing and recent sales, but no profit, supplier bills or cash. Staff keep the device / cashier tiles plus their quick actions.
+- Tests: dashboard tests rewritten and 2 added (figures, supplier due status); 492 passing, Larastan 0 errors, Pint clean. Checked in headless Chrome at 1440 px and 390 px on a throwaway database (`citizensDB_browser`, dropped afterwards) with demo sales.
+
+### 2026-10-07: Owner dashboard redesign plan (plan only, no code changes)
+- Read the owner's mockup (WhatsApp image, 2026-10-07) and compared it with the current dashboard (`DashboardData`, `dashboard.blade.php`).
+- Wrote a 6-step plan: 5 coloured KPI cards, a row of 5 summary panels (payment split, low stock, best sellers today, counter donut, open POs), recent sales / supplier dues / cash summary, and quick actions. Brand green stays the main colour; blue, violet, amber and teal are used only as card accents.
+- Gaps found: no "sub dealer" customer type (the plan uses the wholesale price list instead), no branches (no branch picker), no stock transfers (the button opens Open packs instead), supplier due date = GRN date + supplier payment terms.
 
 ### 2026-10-06: Explained counter staff sign-in and billing (no code changes)
 - Demo counter accounts staff1–3 (password `password`, PIN 3331–3333); register a browser as Counter 1–3 first, then PIN sign-in at `/pin-login`; billing steps with F-keys.

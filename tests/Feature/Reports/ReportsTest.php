@@ -1,16 +1,20 @@
 <?php
 
 use App\Domain\Finance\Services\FinancialReports;
+use App\Domain\Purchasing\Enums\GoodsReceiptStatus;
+use App\Domain\Purchasing\Models\GoodsReceipt;
 use App\Domain\Purchasing\Models\Supplier;
 use App\Domain\Reports\Jobs\ExportReportJob;
 use App\Domain\Reports\Notifications\ReportExportReady;
 use App\Domain\Reports\ReportRegistry;
 use App\Domain\Reports\Services\DailySalesFigures;
+use App\Domain\Reports\Services\DashboardData;
 use App\Domain\Reports\Support\ReportInput;
 use App\Domain\Sales\Actions\ReprintInvoiceAction;
 use App\Domain\Sales\Enums\CounterEventType;
 use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Services\CounterEventRecorder;
+use App\Domain\Sales\Support\Money;
 use Database\Seeders\ChartOfAccountsSeeder;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -205,35 +209,104 @@ test('a return is counted on its own day against the original sale', function ()
         ->and(Sale::query()->count())->toBe(4);
 });
 
-test('the owner dashboard shows today, cash, stock, cheques, balances and the hour chart', function () {
+test('the owner dashboard shows sales, profit, payments, stock, purchases, supplier bills and cash', function () {
     $this->actingAs($this->pos['owner'])->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('Net sales today')
+        ->assertSee("Today's total sales")
         ->assertSee('Rs. 17,700.00')
-        ->assertSee('Cash in drawer (expected)')
-        ->assertSee('Sales by hour today')
-        ->assertSee('Top 10 items')
+        ->assertSee('Gross profit today')
+        ->assertSee('Rs. 1,700.00')
+        ->assertSee('Gross profit this month')
+        ->assertSee('Sales this month')
+        ->assertSee('Total items')
+        ->assertSee('Payment summary')
+        ->assertSee('Low stock items')
+        ->assertSee('Best selling items (today)')
         ->assertSee('Urea 50kg')
-        ->assertSee('Cheques due')
-        ->assertSee('Customers owe the shop');
+        ->assertSee('Sales by counter')
+        ->assertSee('Pending purchases')
+        ->assertSee('Recent sales')
+        ->assertSee($this->first->invoice_no)
+        ->assertSee('Pending payments (suppliers)')
+        ->assertSee('Cash summary (today)')
+        ->assertSee('Closing cash')
+        ->assertSee('Customers owe')
+        ->assertSee('Quick actions')
+        ->assertSee('Add expense');
 });
 
-test('the manager dashboard shows stock and purchasing but no money from the books', function () {
+test('the manager dashboard shows sales, stock and purchasing but no profit or money from the books', function () {
     $this->actingAs($this->pos['manager'])->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('Stock alerts')
-        ->assertSee('Purchasing')
-        ->assertSee('Net sales today')
-        ->assertDontSee('Customers owe the shop')
-        ->assertDontSee('Cheques due')
-        ->assertDontSee('Cash in drawer (expected)');
+        ->assertSee("Today's total sales")
+        ->assertSee('Low stock items')
+        ->assertSee('Pending purchases')
+        ->assertSee('Recent sales')
+        ->assertDontSee('Gross profit')
+        ->assertDontSee('Customers owe')
+        ->assertDontSee('Pending payments (suppliers)')
+        ->assertDontSee('Cash summary (today)');
 });
 
-test('sales staff see their shortcuts, not the shop figures', function () {
+test('sales staff see their device and shortcuts, not the shop figures', function () {
     $this->actingAs($this->pos['staff'])->get(route('dashboard'))
         ->assertOk()
-        ->assertDontSee('Net sales today')
-        ->assertDontSee('Customers owe the shop')
-        ->assertDontSee('Cash in drawer (expected)')
-        ->assertSee('This device');
+        ->assertDontSee("Today's total sales")
+        ->assertDontSee('Payment summary')
+        ->assertDontSee('Cash summary (today)')
+        ->assertSee('This device')
+        ->assertSee('New purchase order');
+});
+
+test('the dashboard figures: yesterday, month, profit, payments, best sellers and cash', function () {
+    $data = app(DashboardData::class);
+
+    // 2 bags + 1 bag less a 300 discount, 1 bag returned; cost Rs. 8000 a bag.
+    expect($data->todaysSales())->toMatchArray(['net' => '17700.00', 'invoices' => 2, 'yesterday' => '0.00', 'change' => null])
+        ->and($data->monthToDate())->toMatchArray(['net' => '17700.00', 'invoices' => 2])
+        ->and($data->profit()['today'])->toBe(['profit' => '1700.00', 'margin' => '9.60'])
+        ->and($data->profit()['month'])->toBe(['profit' => '1700.00', 'margin' => '9.60']);
+
+    $payments = collect($data->paymentsToday()['methods'])->keyBy('method');
+    expect($payments->keys()->all())->toBe(['cash', 'card', 'bank_transfer'])
+        ->and($payments['card']['amount'])->toBe('0.00')
+        ->and($data->paymentsToday()['total'])->toBe($payments['cash']['amount']);
+
+    expect($data->bestSellersToday())->toBe([['id' => $this->urea->id, 'name' => 'Urea 50kg', 'qty' => '100', 'unit' => 'kg']])
+        ->and(collect($data->recentSales())->pluck('invoice')->all())->toBe([$this->second->invoice_no, $this->first->invoice_no]);
+
+    $cash = $data->drawer()['summary'];
+    expect($cash['expected'])->toBe((string) Money::of($cash['opening'])->plus($cash['sales'])->plus($cash['cash_in'])->minus($cash['cash_out']))
+        ->and($cash['cash_out'])->toBe('9000.00');
+
+    $this->travelTo(now()->addDay());
+    expect(app(DashboardData::class)->todaysSales())->toMatchArray(['net' => '0.00', 'yesterday' => '17700.00', 'change' => '-100.00']);
+});
+
+test('unpaid supplier bills are overdue, due soon (within 7 days) or not due', function () {
+    $supplier = Supplier::factory()->create(['name' => 'Agro Lanka', 'payment_terms_days' => 30]);
+    $bill = fn (string $number, int $daysAgo, string $total, string $paid = '0') => GoodsReceipt::query()->forceCreate([
+        'number' => $number, 'supplier_id' => $supplier->id, 'received_at' => now()->subDays($daysAgo), 'status' => GoodsReceiptStatus::Posted,
+        'subtotal' => $total, 'total' => $total, 'amount_paid' => $paid,
+    ]);
+    $bill('GRN-1', 40, '50000.00', '20000.00');
+    $bill('GRN-2', 25, '30000.00');
+    $bill('GRN-3', 10, '10000.00');
+    $bill('GRN-4', 45, '5000.00', '5000.00');
+
+    $dues = app(DashboardData::class)->supplierDues();
+
+    expect(collect($dues['bills'])->map(fn (array $bill) => [$bill['invoice'], $bill['balance'], $bill['status']])->all())->toBe([
+        ['GRN-1', '30000.00', 'overdue'],
+        ['GRN-2', '30000.00', 'due_soon'],
+        ['GRN-3', '10000.00', 'not_due'],
+    ])->and($dues['outstanding'])->toBe('70000.00')
+        ->and($dues['overdue'])->toBe(1);
+
+    $this->actingAs($this->pos['owner'])->get(route('dashboard'))
+        ->assertSee('Agro Lanka')
+        ->assertSee('Overdue')
+        ->assertSee('Due soon')
+        ->assertSee('Rs. 70,000.00')
+        ->assertSee('1 supplier bill(s) overdue');
 });
