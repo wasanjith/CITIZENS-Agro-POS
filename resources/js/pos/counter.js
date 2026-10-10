@@ -573,11 +573,15 @@ export default function posCounter(config) {
 
         async askApproval(scope, line = null) {
             this.error = null;
+            // The server takes the line amount and name from its copy of the cart, so send
+            // any change still waiting for the 300 ms sync first.
             const body = scope === 'line'
-                ? { cart_uuid: this.cart.cart_uuid, scope, line_key: line.key, label: `${line.short_code} ${line.name}`, amount: line.discount, gross: this.lineGross(line) }
-                : { cart_uuid: this.cart.cart_uuid, scope, label: 'Bill discount', amount: this.cart.bill_discount, gross: this.subtotal - this.lineDiscounts };
+                ? { cart_uuid: this.cart.cart_uuid, scope, line_key: line.key, amount: line.discount }
+                : { cart_uuid: this.cart.cart_uuid, scope, amount: this.cart.bill_discount };
 
             try {
+                clearTimeout(this.syncTimer);
+                await this.sync();
                 const data = await api(this.config.urls.approvals, { method: 'POST', body });
                 this.approvals = { ...this.approvals, [data.approval.id]: data.approval };
                 this.notice = 'Approval requested. Wait for the cashier.';
@@ -835,8 +839,11 @@ export default function posCounter(config) {
         selectCustomer(customer) {
             this.customer = customer;
             this.cart.customer_id = customer.id;
-            if (customer.price_list_id && customer.price_list_id !== this.cart.price_list_id) {
-                this.cart.price_list_id = customer.price_list_id;
+            // The customer's own list; without one, staff who may not choose go back to the default.
+            const list = customer.price_list_id
+                || (this.config.can_choose_price_list ? this.cart.price_list_id : this.config.default_price_list_id);
+            if (list && list !== this.cart.price_list_id) {
+                this.cart.price_list_id = list;
                 this.notice = `Price list changed for ${customer.name}.`;
             }
             this.showCustomer = false;
@@ -848,6 +855,8 @@ export default function posCounter(config) {
             this.customer = null;
             this.cart.customer_id = null;
             if (this.isCredit) this.cart.payment_method = 'cash';
+            // The customer's list (e.g. Wholesale) leaves with the customer.
+            if (!this.config.can_choose_price_list) this.cart.price_list_id = this.config.default_price_list_id;
             this.changed();
         },
 

@@ -92,11 +92,49 @@
 | 2026-09-26 | **Reports:** a sale counts on the day it was settled (like the books); a return counts on the day it was taken, against the original sale's counter, staff member and customer; a voided sale does not count. Item, category and brand figures share each bill discount across the lines. Reports over 12 months read the nightly summary. Profit reports are Super Admin only; the Manager sees sales and stock reports with cost. |
 | 2026-10-07 | **Owner dashboard** follows the owner's mockup, in the brand green. No sub-dealer split (owner: leave it out). Gross profit shown for today and for this month (owner only). A supplier bill is due its supplier's payment terms after the goods receipt and is "Due soon" within **7 days** (owner). No branch picker or stock transfers (one shop); that tile opens Open packs. |
 | 2026-09-26 | **Payroll:** no-pay = no-pay days × basic ÷ working days; OT = hours × basic × 1.5 ÷ 240; EPF/ETF on basic − no-pay + allowances marked "EPF applies" (not on OT). Approving posts the salaries as owed (Dr Salaries, EPF/ETF expense; Cr Salaries payable, EPF/ETF payable, Staff advances); paying moves the money (drawer, cash at home or bank, one entry per person). An approved payroll can be reopened until someone is paid. Payroll, employees and advances are Super Admin only and can never be handed over. |
+| 2026-10-09 | **Backups to the server's backup hard disk only, for now.** Cloud storage later, when the owner buys it (add its disk to `BACKUP_DISKS`). |
+| 2026-10-09 | **Manual cash drawer for about one more year.** The drawer logic (sessions, counts, handover, Z report, QZ drawer kick) stays in the code; the "drawer did not open" alert after settlement is commented out until a printer-driven drawer is fitted. |
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-10-10: Sidebar account menu animation
+- Owner: animate the popup (My account / My attendance / Clock in-out) opened from the user card at the bottom of the sidebar.
+- The menu now slides up and scales in from the card (fades out on close); menu items tint green and nudge right on hover; the card stays highlighted while the menu is open and the avatar grows slightly with a green ring on hover. Files: `layouts/partials/sidebar-user.blade.php`, `hr/partials/clock-button.blade.php` (app style only). Assets rebuilt.
+
+### 2026-10-09: Medium audit findings fixed (M1–M5)
+- Owner: fix the medium issues from [PRE_DEPLOYMENT_AUDIT.md](PRE_DEPLOYMENT_AUDIT.md).
+- **M1, PIN vs two-factor:** accounts with 2FA are hidden from the PIN screen and a PIN sign-in for them is refused; after a handover/take-back to such an account the terminal signs out and they sign in with password + code (the handover slip prints after sign-in). Note on the account page; login page now shows a status message.
+- **M2, PIN guessing:** new `PinLockout` service: 15 wrong PINs per user per day (`pos.pin.max_failures_per_day`) lock the PIN until midnight, for PIN sign-in and handover PIN checks. Every wrong PIN is in the audit log (`login_failed` / `pin_failed`, then `pin_locked`), the Super Admins get a "PIN locked" notification, and setting a new PIN unlocks it.
+- **M3, Wholesale at the counter:** new permission `pos.price_list.choose` (Super Admin, delegable in a handover). Without it `CartPricer` accepts only the default list or the customer's own list (invoice/quotation refused; live cart falls back). Counter: price list picker locked for staff, follows the customer, back to Retail when the customer is removed. Migration `2026_10_09_100000_sync_permissions_price_list_choose` re-runs the permission seeder (run on the dev DB).
+- **M4, split write-offs:** the adjustment approval limit counts the user's self-posted adjustments of the day plus the new one. Setting label and form text updated.
+- **M5, approval %:** the line/bill amount and label of a discount request now come from the server's synced cart; the counter's `gross`/`label` are ignored and a discount above the line amount is refused. The counter flushes its pending sync before asking.
+- Tests added: PinLoginTest (2), DrawerHandoverTest (1), CounterInvoiceTest (4, plus the approval test now syncs first), StockAdjustmentTest (1). `LoosePricingTest` now bills Wholesale for a Wholesale customer (staff can no longer pick it for a walk-in). Full suite: **503 tests, all passing**; Larastan 0 errors; Pint clean. Docs: audit M1–M5 marked fixed, Implementation Plan § 4 permission table, USER_GUIDE (PIN lock, 2FA, price list).
+
+### 2026-10-09: Backups to the local disk set up; manual cash drawer kept
+- Owner: (1) for now back up only to a local hard disk in the server, cloud later; (2) the shop keeps its manual cash drawer for about a year, so keep the drawer logic but comment out the "drawer can't work" alert.
+- **Backups** (`spatie/laravel-backup`): new `config/backup.php`, a `backup` disk in `config/filesystems.php` (`BACKUP_PATH`, default `storage/app/backups` for development), and mysqldump settings on the `mysql` connection (`--single-transaction`, `DB_DUMP_BINARY_PATH`). Schedule in `routes/console.php`: database-only every hour 08:00–20:00, full backup (database + `storage/app/private|public` + `.env`) at 22:00, `backup:clean` 01:00, `backup:monitor` 07:20. AES-256 encrypted (`BACKUP_ARCHIVE_PASSWORD`), verified after writing. Kept: everything for 2 days, then daily 14 days, weekly 8 weeks, monthly 12 months, yearly 3 years, max 50 GB. Only failures are reported (to the log while `MAIL_MAILER=log`). Cloud later = add a disk and set `BACKUP_DISKS=backup,cloud`. New `BACKUP_*` keys in `.env.example`.
+- Checked for real on the dev machine (into a temporary folder, then deleted): database-only and full backups created, both encrypted and unreadable without the password, dump complete (93 tables); `backup:clean`, `backup:monitor` and `schedule:list` OK. New test `tests/Feature/System/BackupScheduleTest.php` (3 tests: schedule, the 08:00–20:00 window, config).
+- **Cash drawer**: the `this.error` line in `openDrawer()` (`resources/js/pos/live-billing.js`) is commented out with a note to restore it later; the drawer kick itself, the drawer sessions, counts, handover and Z report are unchanged. Leave *Cash drawer connected* unticked on printer #0 until a printer-driven drawer is fitted (then no kick is even attempted). `npm run build` done.
+- Docs: DEPLOYMENT.md § 12 rewritten (schedule, retention, server setup, adding cloud later, restore steps, limits of on-site-only backups), plus the shopping list, server disk, diagram, drawer and runbook updates; Implementation Plan § 16; audit H3 marked done in code; USER_GUIDE.md and PRINTING.md now say the drawer is opened by hand for now. (The branded client PDF of the user guide still says the drawer opens automatically; regenerate it when it is next sent.)
+
+### 2026-10-09: User card and sign-out at the bottom of the sidebar; bigger logo
+- Owner: put the user account and log out option at the bottom of the sidebar (like a typical sidebar); make the top logo wider.
+- New `layouts/partials/sidebar-user.blade.php`: initials, name and role at the bottom of the sidebar (desktop + mobile), with a sign-out icon button. Clicking the name opens a menu upwards: My account, My attendance, Clock in/out. The old user menu in the top bar was removed (it was the same menu).
+- Logo now fills the sidebar width (~208 px instead of ~144 px); logo header 96 px tall.
+
+### 2026-10-09: Sidebar logo and favicon
+- Owner: remove the "POS · v0.8 (Phase 7)" line from the sidebar; use the real logo and favicon from `Media/logo`.
+- Sidebar (desktop + mobile) and sign-in page now show the yellow-pill logo (`public/images/logo.png`, from Asset 35, which has a filled background so it reads on the dark green). The version line is gone. POS top bar gets the round leaf icon (`public/images/logo-icon.png`).
+- Favicons from `icon01`: `favicon.ico` (16–64 px), `favicon-32x32.png`, `apple-touch-icon.png`, linked in `layouts/partials/head.blade.php`.
+
+### 2026-10-09: Full deployment architecture written (docs only, no code changes)
+- Owner: expand Implementation Plan § 16 (Deployment) into the full setup: machines needed, server computer specs and features.
+- New [DEPLOYMENT.md](DEPLOYMENT.md): network diagram, shopping list (server, 4 terminals, 4 + 1 spare thermal printers, cash drawer, 2–3 UPS, switch, 2 rotating backup disks), server hardware (recommended i5/Ryzen 5, 16 GB, 512 GB NVMe) with memory budget and data-growth estimate, software stack with versions and ports (PHP 8.4, MySQL 8.4, Redis 7, Meilisearch 1.12, Reverb, Chromium), terminal specs and Chrome kiosk setup, IP plan and `pos.citizens.local`, UPS sizing and auto-shutdown, mkcert HTTPS, Tailscale, 3-2-1 backups, hardening, ready-to-use config files (`.env`, Nginx with Reverb proxy, PHP, MySQL, Supervisor, cron, Meilisearch), first-install steps, deploy/rollback script, daily checks and a failure runbook.
+- Plan § 16 now links to it; PHP version there updated from 8.3 to 8.4 (matches the dev machine). Audit report: corrected the seeder name to `RolesAndPermissionsSeeder`.
+- Still needed before go-live (from the audit): backups are not configured in code yet (H3), and QZ Tray request signing is still a TODO.
 
 ### 2026-10-09: Pre-deployment audit (report only, no code changes)
 - Owner: check the whole codebase for bugs and security holes before deployment, and write the findings to a `.md` file.

@@ -39,7 +39,7 @@ CITIZENS Agro sells fertilizers, seeds, agro-chemicals, tools and bicycle parts 
  F9 → invoice prints on the counter printer        
    (stock is RESERVED)                     ──────▶  Invoice appears in that counter's column
  Staff walk invoice + cash to the cashier  ──────▶  Owner checks → [Settle]
-                                                      stock ISSUED, cash in drawer, drawer opens
+                                                      stock ISSUED, cash in drawer (open it by hand)
  Staff hand balance + invoice to customer  ◀──────  Owner gives the balance back
 ```
 
@@ -97,7 +97,8 @@ Everything else in the system feeds or follows this flow:
 | Shop terminals (counters, main cashier) | **PIN** sign-in. Only works on a PC that has been **registered as a terminal** (section 14.2). |
 
 - The **first PIN sign-in of the day** on a shop terminal also **clocks you in** (attendance). Clock out with the button in the top bar.
-- Too many wrong PINs locks the PIN for a while.
+- Too many wrong PINs locks the PIN for a minute. **15 wrong PINs in one day** lock it until midnight: sign in with your password, or ask the owner to set a new PIN (that unlocks it). The owner gets a notification when a PIN locks.
+- If you switched on **two-factor authentication** (My account), PIN sign-in is off for you: sign in with your username, password and code, also on the terminals.
 - Failed and successful sign-ins are written to the audit log.
 - If a PC is not registered, you land on the *"This device is not a registered terminal"* page. Sign in with a password and register it (owner only).
 
@@ -454,7 +455,7 @@ Pay from the drawer, cash at home, a bank transfer, or a **cheque**. The payment
 
 ### 9.1 Opening the day (main cashier)
 
-1. Owner signs in with PIN on the main cashier PC.
+1. Owner signs in with PIN on the main cashier PC (with password and code instead, if two-factor authentication is on).
 2. **POS → Cashier → Open drawer**: count the morning float by denomination (5000 × 3, 1000 × 12 …).
 3. Counter staff sign in with their PIN on Counter 1–3 (this clocks them in).
 
@@ -477,7 +478,8 @@ Pay from the drawer, cash at home, a bank transfer, or a **cheque**. The payment
 Steps:
 1. Add items (search, favourites, recent, or category tiles). Switch the unit on a line if needed.
    - **Loose goods:** type the weight in the quantity box as kg (`1.5`) or grams (`750g`). Under 1 kg the line shows the grams, and the price column shows which price applies (*under 1 kg* or *from 1 kg*, section 6.5).
-   - Choosing a **wholesale customer** (F4) switches the bill to the Wholesale list; items without a wholesale price stay at the retail price.
+   - Choosing a **wholesale customer** (F4) switches the bill to the Wholesale list; items without a wholesale price stay at the retail price. Removing the customer switches back to Retail.
+   - Counter staff cannot pick a price list by hand: the bill uses Retail, or the list on the customer's profile. The owner (or a Manager given *choose price list* in a handover) can pick any list.
 2. Discounts per line or for the bill. Above the staff limit, an **approval request** goes to the cashier; wait for approval before printing.
 3. Tell the customer the total. Choose payment: **Cash** (type tendered; the balance shows large), or Card / Bank transfer / Cheque / **Credit** (credit needs a customer).
 4. **F9**: the server re-prices every line, reserves stock, takes the next invoice number (`INV-2026-000123`) and prints the Sinhala invoice on **this counter's printer**.
@@ -489,7 +491,7 @@ Printer out of paper? Reprint from **Last invoices** (logged, marked COPY).
 
 The screen has **one column per counter**, showing the bill being built live and printed invoices waiting.
 
-- **Settle**: check invoice and money → Settle. Stock is issued (FEFO), payment goes into the drawer session, the cash drawer opens. Card/cheque: enter the reference. **Credit**: see the customer's balance and limit; going over the limit needs the owner's tick (a Manager can't allow it). A **credit bill** prints on the main printer for the customer's signature and shop seal.
+- **Settle**: check invoice and money → Settle. Stock is issued (FEFO), payment goes into the drawer session. Open the cash drawer by hand: the shop uses a manual drawer for now (an automatic one can be added later). Card/cheque: enter the reference. **Credit**: see the customer's balance and limit; going over the limit needs the owner's tick (a Manager can't allow it). A **credit bill** prints on the main printer for the customer's signature and shop seal.
 - **Find** an invoice by its last digits.
 - **Void** with a reason (wrong item/amount, customer left). The counter is offered the bill back to re-bill. Voided invoices keep their number and show as VOID. A sale that has payments applied or returns can't be voided; use a return.
 - **Approvals**: approve or reject discount requests.
@@ -512,7 +514,7 @@ On the cashier screen: **Pay in** (change brought from home), **Pay out** (cash 
 1. Owner: **Hand over** on the main terminal → count the drawer → owner's session closes.
 2. Manager enters **their PIN** and a matching count, the expiry time and scope → Manager's session opens.
 3. The Manager can now settle, void, refund, approve and see Live Billing — **but never** finance, payroll or admin.
-4. Owner returns: **Take back** with a count and the owner's PIN.
+4. Owner returns: **Take back** with a count and the owner's PIN. If the owner uses two-factor authentication, the terminal then shows the sign-in page: the owner signs in with password and code, the handover slip prints, then the cashier screen opens.
 5. The owner can **Revoke now** from the dashboard or **POS → Cashier authority** (works from a phone). Authority also ends automatically at the expiry time.
 
 ### 9.7 Live Billing (POS → Live Billing)

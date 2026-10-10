@@ -3,6 +3,7 @@
 namespace App\Domain\Identity\Actions;
 
 use App\Domain\Identity\Enums\Role;
+use App\Domain\Identity\Services\PinLockout;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -12,6 +13,8 @@ use Illuminate\Validation\ValidationException;
  */
 class SaveUserAction
 {
+    public function __construct(private readonly PinLockout $pinLockout) {}
+
     /**
      * @param  array{name: string, username: string, email?: string|null, role: string, is_active?: bool, password?: string|null, pin?: string|null}  $data
      */
@@ -42,6 +45,8 @@ class SaveUserAction
 
             if (! empty($data['pin'])) {
                 $user->setPin($data['pin']);
+                // A new PIN lifts a lock from too many wrong PINs today.
+                $this->pinLockout->clear($user);
             }
 
             return $user;

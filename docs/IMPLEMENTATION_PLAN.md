@@ -127,6 +127,7 @@ Seeded by `PermissionSeeder`. Names are `module.action`.
 | `pos.void` | ✅ | | | ✅ |
 | `pos.refund` | ✅ | | | ✅ |
 | `pos.discount.override` | ✅ | | | ✅ |
+| `pos.price_list.choose` (bill at any price list; others get the default list or the customer's own) | ✅ | | | ✅ |
 | `pos.approve_requests` | ✅ | | | ✅ |
 | `drawer.manage` (open/close, pay in/out, safe drop) | ✅ | | | ✅ |
 | `drawer.handover` (start a handover) | ✅ | | | – |
@@ -764,12 +765,14 @@ Target: ≥ 80 % coverage on `app/Domain`, 100 % of Actions have feature tests.
 
 ## 16. Deployment
 
+> **Full deployment architecture** (shopping list, server and terminal specs, network and IP plan, UPS, HTTPS, backups, config files, install steps, runbook): see [DEPLOYMENT.md](DEPLOYMENT.md). This section is the summary.
+
 **Shop server** (mini PC, i5/Ryzen 5, 16 GB RAM, 512 GB NVMe SSD, UPS with USB shutdown signal):
-- Ubuntu Server 24.04 LTS · Nginx · PHP 8.3-FPM (opcache on) · MySQL 8.4 · Redis 7 · Meilisearch (systemd) · Chromium (for PDFs) · Node (build only).
+- Ubuntu Server 24.04 LTS · Nginx · PHP 8.4-FPM (opcache on; Laravel 13 needs 8.3+) · MySQL 8.4 · Redis 7 · Meilisearch (systemd) · Chromium (for PDFs) · Node (build only).
 - Supervisor: `queue:work redis --tries=3` (2 workers), `reverb:start`.
 - Cron: `* * * * * php artisan schedule:run`.
 - Static LAN IP + local hostname (`pos.citizens.local`) and a self-signed or local CA HTTPS certificate (needed for webcam and secure cookies).
-- **Backups:** hourly `mysqldump` (kept 48 h locally), nightly `backup:run` to external USB disk + cloud (Google Drive/S3, encrypted), monthly restore test.
+- **Backups:** encrypted `backup:run --only-db` every hour 08:00–20:00 and a full `backup:run` at 22:00 to the **backup HDD in the server** (`BACKUP_PATH`), cleanup and health check daily, monthly restore test. Cloud storage later (owner, 2026-10-09): add its disk to `BACKUP_DISKS`. Details: [DEPLOYMENT.md § 12](DEPLOYMENT.md#12-backups).
 - **Remote access:** Tailscale on the server and the owner's phone (no open ports).
 - **Deploy script:** `git pull` → `composer install --no-dev -o` → `npm ci && npm run build` → `php artisan migrate --force` → `optimize` → `queue:restart` → `scout:sync-index-settings`.
 

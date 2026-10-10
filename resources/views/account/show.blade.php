@@ -24,7 +24,7 @@
             </x-slot:footer>
         </x-ui.card>
 
-        <x-ui.card title="Two-factor authentication" description="A code from an authenticator app (e.g. Google Authenticator) is asked after the password.">
+        <x-ui.card title="Two-factor authentication" description="A code from an authenticator app (e.g. Google Authenticator) is asked after the password. While it is on, PIN sign-in is off for your account: sign in at the terminals with your password and code.">
             @if (! $user->two_factor_secret)
                 <p class="text-sm text-gray-600">Two-factor authentication is <strong>off</strong>.</p>
                 <form method="POST" action="{{ route('two-factor.enable') }}" class="mt-4">

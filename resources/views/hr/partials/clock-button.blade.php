@@ -16,7 +16,7 @@
             @if (($style ?? 'app') === 'pos')
                 <button type="submit" class="rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-gray-900 hover:bg-amber-400" title="Clocked in at {{ $clockRow->clock_in->format('H:i') }}">Clock out</button>
             @else
-                <button type="submit" class="block w-full px-4 py-2 text-left hover:bg-gray-50">Clock out <span class="text-xs text-gray-500">(in at {{ $clockRow->clock_in->format('H:i') }})</span></button>
+                <button type="submit" class="block w-full px-4 py-2 text-left transition-all duration-150 ease-out hover:bg-brand-50 hover:pl-5 hover:text-brand-700">Clock out <span class="text-xs text-gray-500">(in at {{ $clockRow->clock_in->format('H:i') }})</span></button>
             @endif
         </form>
     @elseif (! $clockRow?->clock_in && $clockTerminal)
@@ -25,7 +25,7 @@
             @if (($style ?? 'app') === 'pos')
                 <button type="submit" class="rounded bg-white/15 px-2 py-1 text-xs font-semibold hover:bg-white/25">Clock in</button>
             @else
-                <button type="submit" class="block w-full px-4 py-2 text-left hover:bg-gray-50">Clock in</button>
+                <button type="submit" class="block w-full px-4 py-2 text-left transition-all duration-150 ease-out hover:bg-brand-50 hover:pl-5 hover:text-brand-700">Clock in</button>
             @endif
         </form>
     @endif

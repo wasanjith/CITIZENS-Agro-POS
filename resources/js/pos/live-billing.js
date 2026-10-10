@@ -306,7 +306,10 @@ export default function liveBilling(config) {
             try {
                 await window.CitizensPrinting?.openCashDrawer(this.config.printer || undefined);
             } catch (error) {
-                this.error = `Settled, but the cash drawer did not open (QZ Tray: ${error?.message ?? error}). Open it with the key.`;
+                // The shop keeps its manual cash drawer for now (owner, 2026-10-09: about one
+                // more year), so a drawer that does not open is not an error to show after every
+                // cash settlement. Put this line back when the printer-driven drawer is installed.
+                // this.error = `Settled, but the cash drawer did not open (QZ Tray: ${error?.message ?? error}). Open it with the key.`;
             }
         },
 

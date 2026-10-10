@@ -31,6 +31,8 @@ class CounterController extends Controller
                 'user' => ['id' => $user->id, 'name' => $user->name],
                 'price_lists' => PriceList::query()->orderByDesc('is_default')->orderBy('id')->get(['id', 'name'])->all(),
                 'default_price_list_id' => PriceList::default()?->id,
+                // Otherwise the list follows the customer (CartPricer::priceList).
+                'can_choose_price_list' => $user->can('pos.price_list.choose'),
                 'methods' => PaymentMethod::counterOptions(),
                 'max_discount_percent' => $max !== null ? (string) $max : null,
                 'categories' => Category::query()->whereNull('parent_id')->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'name_si'])->all(),

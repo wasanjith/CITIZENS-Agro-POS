@@ -62,6 +62,13 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+            // mysqldump settings for backups (config/backup.php). All tables are InnoDB,
+            // so a single transaction gives a consistent dump without locking the shop.
+            'dump' => [
+                'dump_binary_path' => env('DB_DUMP_BINARY_PATH', ''),
+                'use_single_transaction',
+                'timeout' => 600,
+            ],
         ],
 
         'mariadb' => [

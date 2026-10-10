@@ -62,6 +62,9 @@ While this file exists, `@vite` loads CSS and JS from a dev server on `localhost
 **Fix:** delete `public/hot` on the server, run `npm run build`, and make sure deployment never copies `public/hot`. It is already in `.gitignore`, so it only matters if files are copied by hand.
 
 ### H3. No backups scheduled
+
+> ✅ **Done in code (2026-10-09), local disk only.** `config/backup.php`, the `backup` disk (`BACKUP_PATH`), and the schedule in `routes/console.php` are in place: database every hour 08:00–20:00, full backup at 22:00, cleanup at 01:00, health check at 07:20, all AES-256 encrypted. Covered by `tests/Feature/System/BackupScheduleTest.php`. A real backup and restore check was run on the dev machine. Cloud storage comes later (owner's decision). **Still to do on the server:** mount the backup HDD, set the `BACKUP_*` values, cron for `schedule:run`, and a restore test. See [DEPLOYMENT.md § 12](DEPLOYMENT.md#12-backups). The original finding follows.
+
 **Where:** `routes/console.php` (schedule), no `config/backup.php`
 
 `spatie/laravel-backup` is installed, and `docs/IMPLEMENTATION_PLAN.md:772` plans hourly dumps and a nightly `backup:run`, but nothing is scheduled and the package is not configured. A disk failure would lose all sales, credit balances and payroll.
@@ -82,6 +85,8 @@ While this file exists, `@vite` loads CSS and JS from a dev server on `localhost
 ## 3. 🟠 Medium
 
 ### M1. PIN sign-in skips two-factor authentication
+
+> ✅ **Fixed (2026-10-09).** Accounts with 2FA are not listed on the PIN screen and a PIN sign-in for them is refused (`PinLoginController`). After a cashier handover or take-back to such an account, the terminal is signed out and they sign in with password and code (`HandoverController::switchUser`). The account page explains this. Tests: `PinLoginTest`, `DrawerHandoverTest`.
 **Where:** `app/Http/Controllers/Auth/PinLoginController.php:61`
 
 Password sign-in goes through Fortify, which asks for the 2FA code. PIN sign-in calls `Auth::login($user)` directly, so a Super Admin who turned on 2FA can still be signed in on any registered terminal with only their 4–6 digit PIN, which gives full owner rights (finance, payroll, users, settings).
@@ -91,6 +96,8 @@ Password sign-in goes through Fortify, which asks for the 2FA code. PIN sign-in 
 - after a PIN sign-in, limit the session to POS work and ask for the password again (`password.confirm` middleware) before the admin, finance and HR areas.
 
 ### M2. A PIN can be guessed in a day by someone at a terminal
+
+> ✅ **Fixed (2026-10-09).** New `PinLockout`: 15 wrong PINs per user per day (`pos.pin.max_failures_per_day`) lock the PIN until midnight, for both PIN sign-in and handover PIN checks. Every wrong PIN is in the audit log (`login_failed` / `pin_failed`, then `pin_locked`), and the Super Admins get a notification. Setting a new PIN unlocks it. Test: `PinLoginTest`.
 **Where:** `PinLoginController::store` (limit 5 attempts per minute per terminal+user, `config/pos.php` → `pin`)
 
 A 4-digit PIN has 10,000 values. At 5 tries a minute the lock never gets longer, so someone standing at a shop PC could try every PIN for the owner's account in about 33 hours (half that on average), and nobody is told. The sign-in screen also lists every user who has a PIN, owner included. Failed PIN tries are not written to the audit log, while failed password sign-ins are (`FortifyServiceProvider`).
@@ -101,6 +108,8 @@ A 4-digit PIN has 10,000 values. At 5 tries a minute the lock never gets longer,
 - think about 6-digit PINs for Super Admins, or not listing Super Admins on the PIN screen.
 
 ### M3. Any counter can bill at the Wholesale price list
+
+> ✅ **Fixed (2026-10-09).** New permission `pos.price_list.choose` (Super Admin, delegable). Without it, `CartPricer` only accepts the default list or the customer's own list: a printed invoice or quotation is refused, and the live cart falls back to the default. On the counter the price list picker is locked for staff and follows the customer. Existing databases get the permission from migration `2026_10_09_100000_sync_permissions_price_list_choose`. Tests: `CounterInvoiceTest`.
 **Where:** `app/Http/Requests/Pos/CartRequest.php:28`, `app/Domain/Sales/Services/CartPricer.php:56`, `app/Http/Controllers/Pos/CounterController.php:32`
 
 The cart takes any `price_list_id`, and every price list is offered on the counter screen. Sales Staff can switch a walk-in customer's bill to Wholesale. That works as an unapproved discount, it skips the 5 % discount limit, and it is not flagged on any loss-prevention report. Wholesale is meant only for the few customers who have it on their profile (see the pricing rules confirmed with the owner).
@@ -108,6 +117,8 @@ The cart takes any `price_list_id`, and every price list is offered on the count
 **Fix:** in `CartPricer`, allow a non-default price list only when (a) it is the selected customer's `price_list_id`, or (b) the user has a new permission such as `pos.price_list.choose` (Owner / delegable). Otherwise use the default list.
 
 ### M4. Stock write-offs can be split to stay under the approval limit
+
+> ✅ **Fixed (2026-10-09).** The limit now counts the user's self-posted adjustments of the day plus the new one (`CreateStockAdjustmentAction::needsApproval`); the setting label and the form say so. Test: `StockAdjustmentTest`.
 **Where:** `app/Domain/Inventory/Actions/CreateStockAdjustmentAction.php:104`
 
 The approval limit (`inventory.adjustment_approval_limit`, Rs. 10,000) is checked per document. A Manager can write off Rs. 40,000 of stock as four adjustments of Rs. 9,900, and each one posts straight away without the owner seeing it.
@@ -115,6 +126,8 @@ The approval limit (`inventory.adjustment_approval_limit`, Rs. 10,000) is checke
 **Fix:** compare against the user's total of auto-approved adjustments for the day (or week), or send the owner a notification for every auto-approved negative adjustment. As a minimum, add "auto-approved adjustments by user" to the loss-prevention reports.
 
 ### M5. Approval requests show a discount % worked out from numbers the counter sent
+
+> ✅ **Fixed (2026-10-09).** `RequestDiscountApprovalAction` takes the line or bill amount and the label from the server's priced copy of the cart (`LiveCartStore`); `gross` and `label` are no longer read from the request, and a discount larger than the line is refused. The counter sends any pending sync before asking. Tests: `CounterInvoiceTest`.
 **Where:** `app/Http/Controllers/Pos/ApprovalController.php:20`, `app/Domain/Sales/Actions/RequestDiscountApprovalAction.php:58`
 
 When a counter asks for a discount above its limit, the `gross` (line or bill amount) and so the `percent` the cashier sees on the approval banner come from the browser. A modified request could ask for Rs. 500 off a Rs. 600 line while claiming the line is Rs. 10,000, and the banner would show "5 %". The money amount shown is correct, and `CartPricer` does check the approved **amount** at invoice time, so the risk depends on whether the cashier reads the rupee amount or the percentage.
@@ -188,13 +201,13 @@ Run on 2026-10-09 against MySQL `citizensDB_testing`.
 1. Production `.env` as in **H1**; `php artisan key:generate` only on a brand-new install (never on an existing database: it breaks encrypted cookies, so every terminal would need to be registered again).
 2. Delete `public/hot` (**H2**), then `npm ci && npm run build`.
 3. `composer install --no-dev --optimize-autoloader`.
-4. `php artisan migrate --force`, then `php artisan db:seed --class=PermissionSeeder --force` (if permissions changed).
+4. `php artisan migrate --force`, then `php artisan db:seed --class=RolesAndPermissionsSeeder --force` (if permissions changed).
 5. `php artisan config:cache route:cache view:cache event:cache`.
 6. Scheduler: Windows Task Scheduler → `php artisan schedule:run` every minute.
 7. Queue worker: `php artisan queue:work redis --tries=3` as a service (NSSM or similar) for report exports and notifications.
 8. Reverb: `php artisan reverb:start` as a service; set `allowed_origins` (**L8**).
 9. Meilisearch running with a master key (`MEILISEARCH_KEY`), then `php artisan scout:sync-index-settings` and `scout:import` for products.
-10. Backups configured, scheduled and restore-tested (**H3**).
+10. Backups: backup HDD mounted, `BACKUP_PATH` and `BACKUP_ARCHIVE_PASSWORD` set, first backup run by hand and restore-tested (**H3**; the code part is done).
 11. Redis password set (`REDIS_PASSWORD`) and Redis/MySQL/Meilisearch bound to localhost or the shop LAN only, never the internet.
 12. Remove demo and dummy data (dummy customers, demo products) before the real import.
 13. Delete the stray `fetchColumn()` file (**L9**).

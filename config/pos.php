@@ -35,6 +35,9 @@ return [
         'pos.void' => ['roles' => ['super_admin'], 'delegable' => true],
         'pos.refund' => ['roles' => ['super_admin'], 'delegable' => true],
         'pos.discount.override' => ['roles' => ['super_admin'], 'delegable' => true],
+        // Bill at any price list (e.g. Wholesale for a walk-in). Without it a bill uses the
+        // default list or the list on the customer's profile (CartPricer).
+        'pos.price_list.choose' => ['roles' => ['super_admin'], 'delegable' => true],
         'pos.approve_requests' => ['roles' => ['super_admin'], 'delegable' => true],
         'drawer.manage' => ['roles' => ['super_admin'], 'delegable' => true],
         'drawer.handover' => ['roles' => ['super_admin'], 'delegable' => null],
@@ -105,6 +108,9 @@ return [
         'min_length' => 4,
         'max_length' => 6,
         'max_attempts_per_minute' => 5,
+        // Wrong PINs per user per day before the PIN stops working until midnight
+        // (PinLockout). Stops someone at a terminal from trying every PIN over a day.
+        'max_failures_per_day' => 15,
     ],
 
     /*

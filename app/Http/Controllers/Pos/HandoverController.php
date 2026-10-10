@@ -72,11 +72,12 @@ class HandoverController extends Controller
             $validated['reason'] ?? null,
         );
 
-        $this->switchUser($request, $manager);
-
-        return redirect()->route('pos.cashier')
-            ->with('success', "{$manager->name} now holds cashier authority until ".$result['delegation']->expires_at->format('H:i').'. Drawer opened with Rs. '.number_format((float) $result['opened']->opening_float, 2).'.')
-            ->with('print_url', route('pos.drawer.report', ['drawerSession' => $result['closed'], 'print' => 1]));
+        return $this->switchUser(
+            $request,
+            $manager,
+            "{$manager->name} now holds cashier authority until ".$result['delegation']->expires_at->format('H:i').'. Drawer opened with Rs. '.number_format((float) $result['opened']->opening_float, 2).'.',
+            route('pos.drawer.report', ['drawerSession' => $result['closed'], 'print' => 1]),
+        );
     }
 
     public function returnForm(Request $request): View|RedirectResponse
@@ -121,13 +122,13 @@ class HandoverController extends Controller
         $slip = route('pos.drawer.report', ['drawerSession' => $result['closed'], 'print' => 1]);
 
         if ($result['opened'] !== null) {
+            $message = "{$newHolder->name} holds cashier authority again. Variance on the returned drawer: Rs. ".number_format((float) $result['closed']->variance, 2).'.';
+
             if (! $newHolder->is($user)) {
-                $this->switchUser($request, $newHolder);
+                return $this->switchUser($request, $newHolder, $message, $slip);
             }
 
-            return redirect()->route('pos.cashier')
-                ->with('success', "{$newHolder->name} holds cashier authority again. Variance on the returned drawer: Rs. ".number_format((float) $result['closed']->variance, 2).'.')
-                ->with('print_url', $slip);
+            return redirect()->route('pos.cashier')->with('success', $message)->with('print_url', $slip);
         }
 
         return redirect()->route('pos.drawer.show')
@@ -156,14 +157,30 @@ class HandoverController extends Controller
 
     /**
      * Sign the terminal over to the next cashier (their PIN was checked in the action).
+     *
+     * A PIN alone must not get round two-factor authentication: for such an account the
+     * terminal is signed out instead, and the next cashier signs in with password and
+     * code. They land on the handover slip, which prints, then go on to the cashier screen.
      */
-    private function switchUser(Request $request, User $user): void
+    private function switchUser(Request $request, User $user, string $message, string $slip): RedirectResponse
     {
         $terminal = $this->currentTerminal->get();
         app(LiveCartStore::class)->signOff($terminal->id);
 
+        if ($user->hasEnabledTwoFactorAuthentication()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            $request->session()->put('url.intended', $slip);
+
+            return redirect()->route('login')
+                ->with('status', "{$message} {$user->name}: sign in with your password and code to start settling.");
+        }
+
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
         app(DelegationService::class)->flush();
+
+        return redirect()->route('pos.cashier')->with('success', $message)->with('print_url', $slip);
     }
 }

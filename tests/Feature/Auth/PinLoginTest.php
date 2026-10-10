@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Identity\Actions\SaveUserAction;
 use App\Domain\Identity\Enums\Role;
 use App\Models\User;
 use Spatie\Activitylog\Models\Activity;
@@ -98,4 +99,55 @@ test('PIN sign-in locks after too many failed attempts', function () {
 
     expect(session('errors')->first('pin'))->toStartWith('Too many attempts');
     $this->assertGuest();
+});
+
+test('an account with two-factor authentication cannot sign in with a PIN', function () {
+    [, $token] = registeredTerminal();
+    $owner = User::factory()->withPin('1111')->create(['name' => 'Owner With Code']);
+    $owner->assignRole(Role::SuperAdmin->value);
+    $owner->forceFill(['two_factor_secret' => encrypt('secret'), 'two_factor_confirmed_at' => now()])->save();
+
+    $this->withCookie(deviceCookie(), $token)
+        ->get(route('pin-login'))
+        ->assertOk()
+        ->assertDontSee('Owner With Code');
+
+    $this->withCookie(deviceCookie(), $token)
+        ->post(route('pin-login.store'), ['user_id' => $owner->id, 'pin' => '1111'])
+        ->assertSessionHasErrors('pin');
+
+    expect(session('errors')->first('pin'))->toContain('two-factor');
+    $this->assertGuest();
+});
+
+test('too many wrong PINs in a day lock the PIN, are logged and tell the owner; a new PIN unlocks it', function () {
+    [, $token] = registeredTerminal();
+    $owner = userWithRole(Role::SuperAdmin);
+    $user = staffWithPin('4321');
+    $limit = config('pos.pin.max_failures_per_day');
+
+    for ($i = 0; $i < $limit; $i++) {
+        // Stay under the per-minute limit, as someone patient would.
+        $this->travel(61)->seconds();
+        $this->withCookie(deviceCookie(), $token)
+            ->post(route('pin-login.store'), ['user_id' => $user->id, 'pin' => '0000']);
+    }
+
+    $this->travel(61)->seconds();
+    $this->withCookie(deviceCookie(), $token)
+        ->post(route('pin-login.store'), ['user_id' => $user->id, 'pin' => '4321'])
+        ->assertSessionHasErrors('pin');
+
+    expect(session('errors')->first('pin'))->toContain('locked for today')
+        ->and(Activity::where('event', 'login_failed')->where('subject_id', $user->id)->count())->toBe($limit)
+        ->and(Activity::where('event', 'pin_locked')->where('subject_id', $user->id)->count())->toBe(1)
+        ->and($owner->notifications()->count())->toBe(1);
+    $this->assertGuest();
+
+    app(SaveUserAction::class)->handle(['name' => $user->name, 'username' => $user->username, 'role' => Role::SalesStaff->value, 'pin' => '5678'], $user);
+
+    $this->withCookie(deviceCookie(), $token)
+        ->post(route('pin-login.store'), ['user_id' => $user->id, 'pin' => '5678'])
+        ->assertRedirect(route('dashboard'));
+    $this->assertAuthenticatedAs($user);
 });

@@ -49,6 +49,23 @@ test('a small adjustment by the manager is posted at once', function () {
         ->and(StockMovement::where('type', MovementType::Damage)->value('qty'))->toBe('-50.000');
 });
 
+test('splitting a write-off into small adjustments does not get round the limit: it counts the day', function () {
+    // 3 × 30 kg × 170 = 5,100 each. The first posts (5,100); the second would make 10,200 today.
+    foreach (range(1, 3) as $i) {
+        $this->actingAs($this->manager)->post(route('inventory.adjustments.store'), adjustmentPayload('-30'))->assertSessionHasNoErrors();
+    }
+
+    expect(StockAdjustment::orderBy('id')->pluck('status')->all())
+        ->toBe([AdjustmentStatus::Approved, AdjustmentStatus::PendingApproval, AdjustmentStatus::PendingApproval])
+        ->and((string) $this->stock->available($this->urea))->toBe('470.000');
+
+    // Tomorrow the count starts again.
+    $this->travelTo(now()->addDay()->startOfDay()->addHours(9));
+    $this->actingAs($this->manager)->post(route('inventory.adjustments.store'), adjustmentPayload('-30'))->assertSessionHasNoErrors();
+
+    expect(StockAdjustment::latest('id')->first()->status)->toBe(AdjustmentStatus::Approved);
+});
+
 test('above the limit it waits for the owner, who approves it', function () {
     Notification::fake();
 

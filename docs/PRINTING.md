@@ -10,7 +10,7 @@ of the same model only after every check below passes.
 2. **Terminals** → *Register this device* next to the right terminal.
 3. **Printers** → edit that terminal's printer → enter the exact *Windows printer name* and the model.
 4. **Printing test** → *Print Sinhala sample*, then *Sinhala + English*.
-5. Main cashier PC only: install QZ Tray, then *Open cash drawer*.
+5. Main cashier PC only, **later**: install QZ Tray, then *Open cash drawer*. Skip this for now: the shop keeps its manual cash drawer for about one more year (owner, 2026-10-09).
 6. *Download sample PDF* and check the Sinhala text.
 
 ## Checklist
@@ -23,7 +23,7 @@ of the same model only after every check below passes.
 | Paper cut after the footer (auto-cutter) | ☐ |
 | Prints silently with `--kiosk-printing` (no dialog) | ☐ |
 | Two PCs print at the same time, each to its own printer | ☐ |
-| Cash drawer opens via QZ Tray, no paper printed | ☐ |
+| Cash drawer opens via QZ Tray, no paper printed | Later (manual drawer for now) |
 | A4 Sinhala PDF correct | ✅ (checked in development, Chrome driver) |
 | Time from click to printed invoice | ___ s (target < 3 s) |
 

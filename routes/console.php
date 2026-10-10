@@ -90,3 +90,11 @@ Schedule::job(new RebuildDailySalesSummariesJob)->dailyAt('02:50');
 Schedule::job(new OverdueCreditReminderJob)->dailyAt('07:05');
 Schedule::job(new ChequesDueReminderJob)->dailyAt('07:10');
 Schedule::job(new MissingClockOutAlertJob)->dailyAt('07:15');
+
+// Backups to the server's backup disk (config/backup.php, docs/DEPLOYMENT.md § 12).
+// Hourly database-only copies during shop hours; the full backup runs last each day so
+// it is the one kept as that day's backup when the hourly ones are cleaned up.
+Schedule::command('backup:run --only-db')->hourly()->between('08:00', '20:00')->withoutOverlapping();
+Schedule::command('backup:run')->dailyAt('22:00')->withoutOverlapping();
+Schedule::command('backup:clean')->dailyAt('01:00');
+Schedule::command('backup:monitor')->dailyAt('07:20');

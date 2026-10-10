@@ -7,6 +7,7 @@ use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductPrice;
 use App\Domain\Catalog\Services\PriceBook;
 use App\Domain\Catalog\Services\ProductSearchService;
+use App\Domain\Customers\Models\Customer;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Inventory\Services\StockService;
 use App\Domain\Sales\Services\CartPricer;
@@ -189,10 +190,13 @@ test('the invoice line records the price list its price came from', function () 
     app(StockService::class)->receive($this->loose, null, '100', '200');
     app(StockService::class)->receive($packet, null, '20', '72');
 
+    // Counter staff bill at Wholesale only for a customer who has it on their profile.
+    $reseller = Customer::factory()->create(['price_list_id' => $this->wholesale->id]);
+
     $sale = counterInvoice($pos, [
         ['product_id' => $this->loose->id, 'unit_id' => unitId('kg'), 'qty' => '2'],
         ['product_id' => $packet->id, 'unit_id' => unitId('packet'), 'qty' => '1'],
-    ], ['price_list_id' => $this->wholesale->id, 'tendered' => '1000']);
+    ], ['price_list_id' => $this->wholesale->id, 'customer_id' => $reseller->id, 'tendered' => '1000']);
 
     $items = $sale->items()->orderBy('line_no')->get();
 

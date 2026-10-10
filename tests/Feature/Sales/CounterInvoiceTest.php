@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Catalog\Models\PriceList;
+use App\Domain\Customers\Models\Customer;
+use App\Domain\Identity\Actions\CreateDelegationAction;
 use App\Domain\Inventory\Models\StockLevel;
 use App\Domain\Sales\Enums\ApprovalStatus;
 use App\Domain\Sales\Enums\CounterEventType;
@@ -111,12 +114,19 @@ test('a discount above the staff limit blocks printing until the cashier approve
     issueAtCounter($this->pos, cartPayload([$line], ['cart_uuid' => $cartUuid, 'tendered' => '8000']))
         ->assertUnprocessable()->assertJsonValidationErrors('discount');
 
+    // The counter syncs every change before it asks.
     atTerminal($this->pos['counterToken'], $this->pos['staff'])
-        ->postJson(route('api.pos.approvals.store'), ['cart_uuid' => $cartUuid, 'scope' => 'line', 'line_key' => 'urea-bag', 'label' => 'Urea', 'amount' => '1000', 'gross' => '9000'])
+        ->postJson(route('api.pos.cart.sync'), cartPayload([$line], ['cart_uuid' => $cartUuid]))
+        ->assertOk();
+
+    atTerminal($this->pos['counterToken'], $this->pos['staff'])
+        ->postJson(route('api.pos.approvals.store'), ['cart_uuid' => $cartUuid, 'scope' => 'line', 'line_key' => 'urea-bag', 'amount' => '1000'])
         ->assertCreated();
 
     $approval = ApprovalRequest::sole();
-    expect($approval->status)->toBe(ApprovalStatus::Pending);
+    expect($approval->status)->toBe(ApprovalStatus::Pending)
+        ->and($approval->payload['gross'])->toBe('9000.00')
+        ->and($approval->payload['percent'])->toBe('11.11');
 
     openDrawer($this->pos['main'], $this->pos['owner']);
     atTerminal($this->pos['mainToken'], $this->pos['owner'])
@@ -177,4 +187,82 @@ test('the counter screen needs a registered terminal', function () {
         ->get(route('pos.counter'))
         ->assertOk()
         ->assertSee('posCounter', false);
+});
+
+test('counter staff cannot bill a walk-in at the Wholesale price list', function () {
+    $wholesale = PriceList::where('name', 'Wholesale')->value('id');
+    $line = ['product_id' => $this->urea->id, 'unit_id' => $this->bag, 'qty' => '1'];
+
+    issueAtCounter($this->pos, cartPayload([$line], ['price_list_id' => $wholesale, 'tendered' => '9000']))
+        ->assertUnprocessable()->assertJsonValidationErrors('price_list_id');
+
+    // The live cart quietly goes back to the default list.
+    $snapshot = atTerminal($this->pos['counterToken'], $this->pos['staff'])
+        ->postJson(route('api.pos.cart.sync'), cartPayload([$line], ['price_list_id' => $wholesale]))
+        ->assertOk()
+        ->json('cart');
+
+    expect($snapshot['price_list_id'])->toBe(PriceList::default()->id)
+        ->and(Sale::count())->toBe(0);
+});
+
+test('a customer with the Wholesale list on their profile is billed at it', function () {
+    $wholesale = PriceList::where('name', 'Wholesale')->value('id');
+    $customer = Customer::factory()->create(['price_list_id' => $wholesale]);
+
+    issueAtCounter($this->pos, cartPayload(
+        [['product_id' => $this->urea->id, 'unit_id' => $this->bag, 'qty' => '1']],
+        ['price_list_id' => $wholesale, 'customer_id' => $customer->id, 'tendered' => '9000'],
+    ))->assertCreated();
+
+    expect(Sale::sole()->price_list_id)->toBe($wholesale);
+});
+
+test('the owner, or a delegate given pos.price_list.choose, may choose any price list', function () {
+    $wholesale = PriceList::where('name', 'Wholesale')->value('id');
+    $cart = fn () => [...cartPayload([['product_id' => $this->urea->id, 'unit_id' => $this->bag, 'qty' => '1']], ['price_list_id' => $wholesale, 'tendered' => '9000']), 'idempotency_key' => Str::random(32)];
+
+    atTerminal($this->pos['counterToken'], $this->pos['owner'])
+        ->postJson(route('api.pos.invoices.store'), $cart())
+        ->assertCreated();
+
+    app(CreateDelegationAction::class)->handle($this->pos['owner'], $this->pos['manager'], now()->addHours(2), ['pos.settle', 'pos.price_list.choose']);
+
+    atTerminal($this->pos['counterToken'], $this->pos['manager'])
+        ->postJson(route('api.pos.invoices.store'), $cart())
+        ->assertCreated();
+
+    expect(Sale::where('price_list_id', $wholesale)->count())->toBe(2);
+});
+
+test('an approval request takes the line amount and name from the synced cart, not the request', function () {
+    $cartUuid = (string) Str::uuid();
+    $line = ['key' => 'urea-bag', 'product_id' => $this->urea->id, 'unit_id' => $this->bag, 'qty' => '1', 'discount' => '5000'];
+    $ask = fn (array $body) => atTerminal($this->pos['counterToken'], $this->pos['staff'])
+        ->postJson(route('api.pos.approvals.store'), ['cart_uuid' => $cartUuid, ...$body]);
+
+    // Nothing synced yet for this bill.
+    $ask(['scope' => 'line', 'line_key' => 'urea-bag', 'amount' => '5000'])
+        ->assertUnprocessable()->assertJsonValidationErrors('cart_uuid');
+
+    atTerminal($this->pos['counterToken'], $this->pos['staff'])
+        ->postJson(route('api.pos.cart.sync'), cartPayload([$line], ['cart_uuid' => $cartUuid, 'bill_discount' => '1000']))
+        ->assertOk();
+
+    // A tampered request claiming a big line ("gross") and another label is ignored.
+    $ask(['scope' => 'line', 'line_key' => 'urea-bag', 'amount' => '5000', 'gross' => '100000', 'label' => 'Pen'])->assertCreated();
+    $ask(['scope' => 'line', 'line_key' => 'not-on-the-bill', 'amount' => '10'])->assertUnprocessable()->assertJsonValidationErrors('line_key');
+    $ask(['scope' => 'line', 'line_key' => 'urea-bag', 'amount' => '9500'])->assertUnprocessable()->assertJsonValidationErrors('amount');
+    $ask(['scope' => 'bill', 'amount' => '1000'])->assertCreated();
+
+    $line = ApprovalRequest::where('payload->scope', 'line')->where('status', ApprovalStatus::Pending)->sole();
+    $bill = ApprovalRequest::where('payload->scope', 'bill')->sole();
+
+    expect($line->payload['gross'])->toBe('9000.00')
+        ->and($line->payload['percent'])->toBe('55.56')
+        ->and($line->payload['label'])->toContain('Urea')
+        // Bill discount on 9000 less the 5000 line discount.
+        ->and($bill->payload['gross'])->toBe('4000.00')
+        ->and($bill->payload['percent'])->toBe('25.00')
+        ->and($bill->payload['label'])->toBe('Bill discount');
 });

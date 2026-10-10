@@ -8,21 +8,22 @@
     <div x-show="sidebarOpen" x-cloak class="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true">
         <div class="fixed inset-0 bg-gray-900/60" @click="sidebarOpen = false"></div>
         <aside class="relative flex h-full w-64 flex-col bg-brand-900" x-trap.noscroll="sidebarOpen">
-            <div class="flex h-16 shrink-0 items-center justify-between px-4">
-                <span class="text-lg font-bold text-white">CITIZENS Agro</span>
+            <div class="flex h-24 shrink-0 items-center justify-between gap-3 px-4">
+                <img src="{{ asset('images/logo.png') }}" alt="CITIZENS Agro" class="h-auto min-w-0 flex-1">
                 <button type="button" class="text-2xl text-brand-100" @click="sidebarOpen = false" aria-label="Close menu">&times;</button>
             </div>
             @include('layouts.partials.sidebar')
+            @include('layouts.partials.sidebar-user')
         </aside>
     </div>
 
     {{-- Desktop sidebar --}}
     <aside class="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col bg-brand-900">
-        <div class="flex h-16 shrink-0 items-center px-6">
-            <a href="{{ route('dashboard') }}" class="text-lg font-bold tracking-tight text-white">CITIZENS Agro</a>
+        <div class="flex h-24 shrink-0 items-center px-4">
+            <a href="{{ route('dashboard') }}" class="block w-full"><img src="{{ asset('images/logo.png') }}" alt="CITIZENS Agro" class="h-auto w-full"></a>
         </div>
         @include('layouts.partials.sidebar')
-        <p class="shrink-0 px-6 py-4 text-xs text-brand-200/70">POS · v0.8 (Phase 7)</p>
+        @include('layouts.partials.sidebar-user')
     </aside>
 
     <div class="lg:pl-60">
@@ -99,26 +100,6 @@
                 @endif
             </a>
 
-            <div class="flex items-center gap-3" x-data="{ open: false }" @click.outside="open = false">
-                <button type="button" class="flex items-center gap-2 rounded-full p-0.5 text-sm" @click="open = !open" :aria-expanded="open">
-                    <span class="flex size-8 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">{{ auth()->user()->initials() }}</span>
-                    <span class="hidden text-left sm:block">
-                        <span class="block font-medium leading-tight">{{ auth()->user()->name }}</span>
-                        <span class="block text-xs leading-tight text-gray-500">{{ auth()->user()->primaryRole()?->label() }}</span>
-                    </span>
-                </button>
-                <div x-show="open" x-cloak x-transition class="absolute right-4 top-14 w-48 rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black/5">
-                    <a href="{{ route('account') }}" class="block px-4 py-2 hover:bg-gray-50">My account</a>
-                    @can('hr.attendance.self')
-                        <a href="{{ route('hr.attendance.mine') }}" class="block px-4 py-2 hover:bg-gray-50">My attendance</a>
-                    @endcan
-                    @include('hr.partials.clock-button', ['style' => 'app'])
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit" class="block w-full px-4 py-2 text-left hover:bg-gray-50">Sign out</button>
-                    </form>
-                </div>
-            </div>
         </header>
 
         <main class="@yield('main_class', 'mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8')">

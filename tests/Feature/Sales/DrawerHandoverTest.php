@@ -164,6 +164,26 @@ test('take back: the Manager counts, the delegation is revoked and a new session
     $this->assertAuthenticatedAs($this->pos['owner']);
 });
 
+test('take back by an owner with two-factor authentication: the drawer is theirs, but they sign in with password and code', function () {
+    $this->pos['owner']->forceFill(['two_factor_secret' => encrypt('secret'), 'two_factor_confirmed_at' => now()])->save();
+    openDrawer($this->pos['main'], $this->pos['owner'], 13);
+    atTerminal($this->pos['mainToken'], $this->pos['owner'])->post(route('pos.handover.store'), handoverForm($this->pos))->assertRedirect();
+
+    atTerminal($this->pos['mainToken'], $this->pos['manager'])
+        ->post(route('pos.handover.return.store'), [
+            'denominations' => ['5000' => 2, '1000' => 3],
+            'new_holder_id' => $this->pos['owner']->id,
+            'new_holder_pin' => '1111',
+        ])
+        ->assertRedirect(route('login'))
+        ->assertSessionHas('status');
+
+    // The PIN alone did not sign the owner in; the slip prints after their full sign-in.
+    $this->assertGuest();
+    expect(DrawerSession::query()->open()->sole()->holder_user_id)->toBe($this->pos['owner']->id)
+        ->and(session('url.intended'))->toContain('/report');
+});
+
 test('remote revoke blocks the Manager, who can still count and close the drawer', function () {
     openDrawer($this->pos['main'], $this->pos['owner'], 13);
     atTerminal($this->pos['mainToken'], $this->pos['owner'])->post(route('pos.handover.store'), handoverForm($this->pos))->assertRedirect();

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Domain\Identity\Services\PinLockout;
 use App\Domain\Identity\Support\CurrentTerminal;
 use App\Domain\System\Services\Settings;
 use App\Http\Controllers\Controller;
@@ -23,16 +24,18 @@ class PinLoginController extends Controller
         return view('auth.pin-login', [
             'terminal' => $currentTerminal->get(),
             'clockInPhoto' => (bool) $settings->get('hr.clock_in_photo', false),
+            // Accounts with two-factor authentication sign in with password + code only.
             'users' => User::query()
                 ->active()
                 ->whereNotNull('pin_hash')
+                ->where(fn ($query) => $query->whereNull('two_factor_secret')->orWhereNull('two_factor_confirmed_at'))
                 ->with('roles')
                 ->orderBy('name')
                 ->get(),
         ]);
     }
 
-    public function store(Request $request, CurrentTerminal $currentTerminal): RedirectResponse
+    public function store(Request $request, CurrentTerminal $currentTerminal, PinLockout $lockout): RedirectResponse
     {
         $pin = config('pos.pin');
 
@@ -54,13 +57,27 @@ class PinLoginController extends Controller
 
         $user = User::query()->active()->find($validated['user_id']);
 
+        // A PIN alone must not get round the second factor.
+        if ($user !== null && $user->hasEnabledTwoFactorAuthentication()) {
+            throw ValidationException::withMessages(['pin' => 'This account uses two-factor authentication. Sign in with your username and password.']);
+        }
+
+        if ($user !== null) {
+            $lockout->ensureUnlocked($user);
+        }
+
         if ($user === null || ! $user->checkPin($validated['pin'])) {
             RateLimiter::hit($throttleKey, 60);
+
+            if ($user !== null) {
+                $lockout->failed($user, 'login_failed', 'Failed sign-in');
+            }
 
             throw ValidationException::withMessages(['pin' => 'Incorrect PIN.']);
         }
 
         RateLimiter::clear($throttleKey);
+        $lockout->clear($user);
 
         Auth::login($user);
         $request->session()->regenerate();

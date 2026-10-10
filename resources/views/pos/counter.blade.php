@@ -138,7 +138,9 @@
                 <span class="font-semibold">Bill <span class="text-gray-500" x-text="`(${cart.lines.length} ${cart.lines.length === 1 ? 'item' : 'items'})`"></span></span>
                 <span class="flex items-center gap-2">
                     <label class="sr-only" for="price-list">Price list</label>
-                    <select id="price-list" x-model.number="cart.price_list_id" @change="changed()" class="rounded-md border-gray-300 py-1 text-xs">
+                    <select id="price-list" x-model.number="cart.price_list_id" @change="changed()" :disabled="!config.can_choose_price_list"
+                            :title="config.can_choose_price_list ? '' : 'Set by the customer (F4). Only the cashier can choose another price list.'"
+                            class="rounded-md border-gray-300 py-1 text-xs disabled:bg-gray-50 disabled:text-gray-600">
                         <template x-for="list in config.price_lists" :key="list.id">
                             <option :value="list.id" x-text="list.name" :selected="list.id === cart.price_list_id"></option>
                         </template>

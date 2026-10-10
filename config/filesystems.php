@@ -47,6 +47,15 @@ return [
             'report' => false,
         ],
 
+        // Backups (config/backup.php). On the shop server BACKUP_PATH is the backup
+        // hard disk, e.g. /mnt/backup/citizens. Never inside the app folder in production.
+        'backup' => [
+            'driver' => 'local',
+            'root' => env('BACKUP_PATH', storage_path('app/backups')),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

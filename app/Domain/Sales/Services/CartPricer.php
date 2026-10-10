@@ -53,8 +53,8 @@ class CartPricer
     public function price(array $cart, User $user, bool $strict = true): array
     {
         $cartUuid = (string) ($cart['cart_uuid'] ?? '');
-        $priceListId = (int) ($cart['price_list_id'] ?? 0) ?: (int) PriceList::default()?->id;
         $customer = $this->customer($cart, $strict);
+        $priceListId = $this->priceList($cart, $customer, $user, $strict);
         $rawLines = array_values(array_filter((array) ($cart['lines'] ?? []), 'is_array'));
 
         $productIds = array_values(array_unique(array_map(fn (array $line) => (int) ($line['product_id'] ?? 0), $rawLines)));
@@ -254,6 +254,29 @@ class CartPricer
             '_gross' => $gross,
             '_tax_rate' => $taxRate,
         ];
+    }
+
+    /**
+     * The price list of the bill. Anyone may use the default (Retail) list or the list on
+     * the customer's profile (e.g. Wholesale for a reseller). Any other list needs
+     * pos.price_list.choose: for a walk-in it would be a discount nobody approved.
+     *
+     * @param  array<string, mixed>  $cart
+     */
+    private function priceList(array $cart, ?Customer $customer, User $user, bool $strict): int
+    {
+        $default = (int) PriceList::default()?->id;
+        $requested = (int) ($cart['price_list_id'] ?? 0) ?: $default;
+
+        if ($requested === $default
+            || ($customer?->price_list_id !== null && $requested === $customer->price_list_id)
+            || $user->can('pos.price_list.choose')) {
+            return $requested;
+        }
+
+        $this->fail($strict, 'price_list_id', 'This price list is only for customers who have it on their profile. Choose the customer (F4), or ask the cashier.');
+
+        return $default;
     }
 
     /**

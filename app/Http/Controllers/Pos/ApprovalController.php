@@ -21,17 +21,14 @@ class ApprovalController extends Controller
             'cart_uuid' => ['required', 'uuid'],
             'scope' => ['required', 'in:line,bill'],
             'line_key' => ['required_if:scope,line', 'nullable', 'string', 'max:64'],
-            'label' => ['required', 'string', 'max:191'],
             'amount' => ['required', 'numeric', 'gt:0', 'max:99999999'],
-            'gross' => ['required', 'numeric', 'gt:0', 'max:99999999'],
         ]);
 
+        // The line amount and label are taken from the server's copy of the cart.
         $approval = $requestApproval->handle($currentTerminal->get(), $request->user(), $validated['cart_uuid'], [
             'scope' => $validated['scope'],
             'line_key' => $validated['line_key'] ?? null,
-            'label' => $validated['label'],
             'amount' => (string) $validated['amount'],
-            'gross' => (string) $validated['gross'],
         ]);
 
         return response()->json(['approval' => $approval->toBroadcast()], 201);

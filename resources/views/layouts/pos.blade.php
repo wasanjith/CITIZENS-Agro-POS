@@ -19,6 +19,7 @@
     <div class="flex h-full flex-col">
         <header class="flex h-12 shrink-0 items-center justify-between gap-3 bg-brand-900 px-3 text-sm text-white sm:px-4">
             <div class="flex min-w-0 items-center gap-3">
+                <img src="{{ asset('images/logo-icon.png') }}" alt="" class="size-8 shrink-0">
                 <span class="hidden font-bold sm:inline">CITIZENS Agro</span>
                 @if ($posTerminal)
                     <span class="rounded bg-white/15 px-2 py-0.5 text-xs font-semibold">{{ $posTerminal->displayName() }}</span>

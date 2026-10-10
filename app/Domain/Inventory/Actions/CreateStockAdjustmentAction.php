@@ -97,11 +97,35 @@ class CreateStockAdjustmentAction
         return $adjustment;
     }
 
+    /**
+     * Above the limit the owner approves. The limit counts everything this user posted on
+     * their own today plus this adjustment, so splitting one large write-off into several
+     * small adjustments does not get round it.
+     */
     private function needsApproval(StockAdjustment $adjustment, User $actor): bool
     {
+        if ($actor->can('approveAny', StockAdjustment::class)) {
+            return false;
+        }
+
         $limit = BigDecimal::of((string) $this->settings->get('inventory.adjustment_approval_limit', 0));
 
-        return BigDecimal::of($adjustment->total_value)->isGreaterThan($limit) && ! $actor->can('approveAny', StockAdjustment::class);
+        return BigDecimal::of($adjustment->total_value)->plus($this->postedTodayBy($actor))->isGreaterThan($limit);
+    }
+
+    /**
+     * Value of the adjustments the user created and that posted without the owner today.
+     */
+    private function postedTodayBy(User $actor): BigDecimal
+    {
+        $total = StockAdjustment::query()
+            ->where('created_by', $actor->id)
+            ->where('approved_by', $actor->id)
+            ->where('status', AdjustmentStatus::Approved)
+            ->where('created_at', '>=', today())
+            ->sum('total_value');
+
+        return BigDecimal::of((string) $total)->toScale(2, RoundingMode::HalfUp);
     }
 
     /**

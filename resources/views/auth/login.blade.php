@@ -7,6 +7,10 @@
 
     <h1 class="text-lg font-semibold text-gray-900">Sign in</h1>
 
+    @if (session('status'))
+        <x-ui.alert type="success" class="mt-4">{{ session('status') }}</x-ui.alert>
+    @endif
+
     @if ($terminal)
         <x-ui.alert type="info" class="mt-4">
             This device is <strong>{{ $terminal->displayName() }}</strong>.

@@ -9,7 +9,7 @@
         title="Adjust stock"
         :description="$canApproveAny
             ? 'Correct stock for damage, expiry, loss or found goods. It is posted straight away.'
-            : 'Correct stock for damage, expiry, loss or found goods. Above Rs. '.number_format((float) $approvalLimit, 2).' it waits for the Super Admin\'s approval.'"
+            : 'Correct stock for damage, expiry, loss or found goods. When your adjustments today add up to more than Rs. '.number_format((float) $approvalLimit, 2).', it waits for the Super Admin\'s approval.'"
     />
 
     @if ($errors->any())

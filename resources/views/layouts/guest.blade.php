@@ -6,7 +6,7 @@
 <body class="flex min-h-full items-center justify-center px-4 py-10 font-sans text-gray-900 antialiased">
     <div class="w-full @yield('width', 'max-w-sm')">
         <div class="mb-6 text-center text-white">
-            <p class="text-2xl font-bold tracking-tight">CITIZENS Agro</p>
+            <img src="{{ asset('images/logo.png') }}" alt="CITIZENS Agro" class="mx-auto mb-2 h-20 w-auto">
             <p class="font-sinhala text-sm text-brand-200">සිටිසන්ස් ඇග්‍රෝ · POS</p>
         </div>
         <div class="rounded-xl bg-white p-6 shadow-xl sm:p-8">
