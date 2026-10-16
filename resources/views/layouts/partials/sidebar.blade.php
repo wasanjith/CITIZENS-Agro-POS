@@ -52,6 +52,7 @@
         'Purchasing' => ['icon' => 'truck', 'items' => [
             ['label' => 'Purchase orders', 'route' => 'purchasing.purchase-orders.index', 'active' => 'purchasing.purchase-orders.*', 'can' => ['purchasing.po.create', 'purchasing.po.approve']],
             ['label' => 'Goods received', 'route' => 'purchasing.goods-receipts.index', 'active' => 'purchasing.goods-receipts.*', 'can' => 'purchasing.grn.create'],
+            ['label' => 'Invoices', 'route' => 'purchasing.invoices.index', 'active' => 'purchasing.invoices.*', 'can' => 'purchasing.suppliers.manage'],
             ['label' => 'Supplier returns', 'route' => 'purchasing.supplier-returns.index', 'active' => 'purchasing.supplier-returns.*', 'can' => 'purchasing.grn.create'],
             ['label' => 'Suppliers', 'route' => 'purchasing.suppliers.index', 'active' => 'purchasing.suppliers.*', 'can' => 'purchasing.suppliers.manage'],
             ['label' => 'Supplier payments', 'route' => 'purchasing.supplier-payments.index', 'active' => 'purchasing.supplier-payments.*', 'can' => ['purchasing.suppliers.pay', 'purchasing.suppliers.manage']],

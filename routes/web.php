@@ -62,8 +62,10 @@ use App\Http\Controllers\Pos\InvoiceController;
 use App\Http\Controllers\Pos\PrintController;
 use App\Http\Controllers\Pos\QuotationController as PosQuotationController;
 use App\Http\Controllers\Purchasing\GoodsReceiptController;
+use App\Http\Controllers\Purchasing\GoodsReceiptInvoiceController;
 use App\Http\Controllers\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Purchasing\SupplierController;
+use App\Http\Controllers\Purchasing\SupplierDocumentController;
 use App\Http\Controllers\Purchasing\SupplierPaymentController;
 use App\Http\Controllers\Purchasing\SupplierReturnController;
 use App\Http\Controllers\Reports\ReportController;
@@ -261,6 +263,16 @@ Route::middleware('auth')->group(function () {
         Route::resource('goods-receipts', GoodsReceiptController::class)->except(['destroy']);
         Route::post('goods-receipts/{goods_receipt}/post', [GoodsReceiptController::class, 'post'])->name('goods-receipts.post');
         Route::post('goods-receipts/{goods_receipt}/cancel', [GoodsReceiptController::class, 'cancel'])->name('goods-receipts.cancel');
+        Route::post('goods-receipts/{goods_receipt}/invoices', [GoodsReceiptInvoiceController::class, 'store'])->name('goods-receipts.invoices.store');
+        Route::get('goods-receipts/{goods_receipt}/invoices/{invoice}', [GoodsReceiptInvoiceController::class, 'show'])->name('goods-receipts.invoices.show')->scopeBindings();
+        Route::delete('goods-receipts/{goods_receipt}/invoices/{invoice}', [GoodsReceiptInvoiceController::class, 'destroy'])->name('goods-receipts.invoices.destroy')->scopeBindings();
+
+        // Invoices: a folder per supplier with its invoices, bank deposit slips and receipts.
+        Route::get('invoices', [SupplierDocumentController::class, 'index'])->name('invoices.index');
+        Route::get('invoices/{supplier}', [SupplierDocumentController::class, 'show'])->name('invoices.show');
+        Route::post('invoices/{supplier}', [SupplierDocumentController::class, 'store'])->name('invoices.store');
+        Route::get('invoices/{supplier}/files/{file}', [SupplierDocumentController::class, 'file'])->name('invoices.file');
+        Route::delete('invoices/{supplier}/documents/{document}', [SupplierDocumentController::class, 'destroy'])->name('invoices.destroy')->scopeBindings();
 
         Route::resource('supplier-returns', SupplierReturnController::class)->only(['index', 'create', 'store', 'show']);
 

@@ -118,6 +118,16 @@ class GoodsReceipt extends Model implements StockReference
     }
 
     /**
+     * Photos / PDFs of the supplier's invoice.
+     *
+     * @return HasMany<GoodsReceiptInvoice, $this>
+     */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(GoodsReceiptInvoice::class)->orderBy('id');
+    }
+
+    /**
      * Sealed packs opened into loose stock when this GRN was posted.
      *
      * @return HasMany<PackOpening, $this>

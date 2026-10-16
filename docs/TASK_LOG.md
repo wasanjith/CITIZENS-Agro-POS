@@ -10,8 +10,8 @@
 | Item | Status |
 |---|---|
 | **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
-| **Last updated** | 2026-10-09 |
-| **Tests** | 492 Pest tests, all passing (Meilisearch was running, so none skipped). |
+| **Last updated** | 2026-10-16 |
+| **Tests** | 492 Pest tests at the last full run (2026-10-09) + 20 new. 2026-10-16: the 43 Purchasing tests (9 new) pass; the full suite was not re-run. |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
 | **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
@@ -94,11 +94,59 @@
 | 2026-09-26 | **Payroll:** no-pay = no-pay days × basic ÷ working days; OT = hours × basic × 1.5 ÷ 240; EPF/ETF on basic − no-pay + allowances marked "EPF applies" (not on OT). Approving posts the salaries as owed (Dr Salaries, EPF/ETF expense; Cr Salaries payable, EPF/ETF payable, Staff advances); paying moves the money (drawer, cash at home or bank, one entry per person). An approved payroll can be reopened until someone is paid. Payroll, employees and advances are Super Admin only and can never be handed over. |
 | 2026-10-09 | **Backups to the server's backup hard disk only, for now.** Cloud storage later, when the owner buys it (add its disk to `BACKUP_DISKS`). |
 | 2026-10-09 | **Manual cash drawer for about one more year.** The drawer logic (sessions, counts, handover, Z report, QZ drawer kick) stays in the code; the "drawer did not open" alert after settlement is commented out until a printer-driven drawer is fitted. |
+| 2026-10-10 | **The shop server is also the main cashier** (Ubuntu Desktop, Chrome kiosk for a `cashier` user, printer #0 via CUPS). 4 computers in total: server/main cashier + 3 counter PCs. The thermal printer model must pass the Sinhala print test on both Windows and Linux. |
+| 2026-10-15 | **Supplier invoice photos** on every GRN (PO or direct delivery), taken with the phone camera or picked from the gallery (photos or PDF). Saved on the server's local disk, one folder per supplier (`supplier-invoices/<supplier-name>/`). Owner/Manager attach; after posting, only the Owner removes. |
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-10-16: Purchasing → Invoices: a folder for each supplier
+- Owner: a new *Invoices* item under Purchasing that shows every supplier as a file (folder squares, searchable); open one to add the supplier's invoices, bank deposit slips and all other receipts.
+- New tables `supplier_documents` (type, date, number, amount, note, who added it) and `supplier_document_files` (one row per page); enum `SupplierDocumentType` (Invoice, Bank deposit slip, Receipt, Other); models `SupplierDocument`, `SupplierDocumentFile`; `SaveSupplierDocumentAction`, `RemoveSupplierDocumentAction`; `SupplierDocumentPolicy`; `SupplierDocumentController`; `Support/SupplierFolderItem`. Routes `purchasing.invoices.*` (`/purchasing/invoices`).
+- **Folders page:** square folder tiles (yellow = has papers, grey = empty) with counts per type and last update; instant search by name, contact or phone; sort A–Z or recently updated. Inactive suppliers only show while their folder holds papers.
+- **Folder page:** type chips with counts, year filter, search (number, amount, note, file name, GRN no.); document tiles with thumbnail, type badge, date, amount, number, note and page links. The GRN invoice photos from 2026-10-15 also show here as invoices, linked to their GRN. *Add document* reuses the camera/gallery picker (`<x-purchasing.invoice-photos-input>`), so photos are shrunk on the phone.
+- Files: `storage/app/private/supplier-invoices/<supplier-slug>/<invoices|deposit-slips|receipts|other>/<date>_<number>_<n>.jpg`; already covered by the backup.
+- Rules: Owner and Manager (`purchasing.suppliers.manage`); sales staff can't see it. The Owner removes any document; the Manager only their own on the day they added it. Add/remove are in the audit log (on the supplier).
+- Supplier page: new **Invoices & slips** button.
+- Checked in headless Chrome on a throwaway DB (desktop and 390 px phone): folder grid, instant search and no-match message, folder page, camera photo → save → tile, type filter; no sideways scroll. Fixed from the screenshots: "1 invoices" plurals, and squeezed date/amount on phone tiles. Test files removed from storage afterwards.
+- Tests: 9 new (`tests/Feature/Purchasing/SupplierDocumentTest.php`); Purchasing suite 43/43 pass. Pint clean, Larastan 0 errors on the changed code. Migration run on `citizensDB`; `npm run build` done.
+- Docs: USER_GUIDE § 8.6.
+- **Set up on another PC / the server:** `php artisan migrate` and `npm run build`.
+
+### 2026-10-15: Post-dated cheques to suppliers (answer only, no changes)
+- Owner asked how to issue a cheque with a future date, and to build it if missing.
+- Already built in Phase 5: Purchasing → Supplier payments → Pay a supplier → *Paid by: Cheque*, bank account, cheque number, and a later **Cheque date** (post-dated). The supplier's balance drops at once; the bank only drops when the cheque is marked **Cleared** (Finance → Cheques). Cheque calendar, the morning bell alert (issued cheques due within 3 days, Settings → Finance) and the dashboard tile already cover issued cheques.
+- Gap found, not changed: an issued post-dated cheque can be marked *Cleared* before its cheque date. Offered to block that.
+
+### 2026-10-15: Supplier invoice photos on goods receipts (phone camera)
+- Owner: when goods arrive (on a purchase order or a sudden delivery without one), the Owner/Manager photographs the supplier's invoice; the photo is kept on the server in a folder per supplier; works on a phone with a camera button.
+- New table `goods_receipt_invoices` + model `GoodsReceiptInvoice`; `AttachSupplierInvoiceAction`, `RemoveSupplierInvoiceAction`; `GoodsReceiptInvoiceController` (upload, view, remove); policy `attachInvoice` / `removeInvoice`.
+- Files: `storage/app/private/supplier-invoices/<supplier-slug>/<date>_<GRN no.>_<n>.jpg` (`supplier-<id>` for Sinhala-only names). Photos and PDF, up to 10 per upload, 10 MB each. Covered by the existing backup (`storage/app/private`).
+- UI: new component `<x-purchasing.invoice-photos-input>` + Alpine `invoicePhotos`: **Take photo** (`capture="environment"`, opens the back camera) and **Choose files** (gallery/PDF), previews with remove; photos are shrunk in the browser to max 2000 px JPEG (a 7.7 MB test photo went up as 0.9 MB). On the *Receive goods* form and on the GRN page (*Supplier invoice* card with thumbnails, placed above the goods on phones). The GRN list shows a camera badge with the photo count.
+- Fixed: the GRN page was 32 px wider than a phone screen (the goods table pushed the grid column); the table now scrolls inside its card.
+- Rules: Owner/Manager attach to draft or posted GRNs, not cancelled ones; the Manager removes only from drafts, the Owner always; add/remove are in the audit log. Sales staff can't see them.
+- Checked in headless Chrome at phone size (390 px) on a throwaway DB: camera input → preview → save → thumbnail; no sideways scroll on the form or GRN page; desktop layout unchanged.
+- Tests: 11 new (`tests/Feature/Purchasing/GoodsReceiptInvoiceTest.php`); Purchasing suite 34/34 pass. Pint clean, Larastan 0 errors on the changed code. Migration run on `citizensDB`; `npm run build` done.
+- Docs: USER_GUIDE § 8.3.
+- **Set up on another PC / the server:** `php artisan migrate` and `npm run build`.
+
+### 2026-10-11: Parts list for the self-built server
+- Owner chose the physical server in the shop and will assemble it from parts.
+- `docs/DEPLOYMENT.md`: new § 4.1.1 *Parts list* (CPU with built-in graphics, cooler, motherboard, RAM in two sticks, NVMe with DRAM cache, backup HDD, PSU, case, monitor, UPS, minimum vs recommended, BIOS settings and burn-in tests); mini PC wording changed to a self-built desktop. Docs only.
+
+### 2026-10-11: Cloud VM vs physical server compared (answer only, no changes)
+- Owner asked how a rented VM (cloud server) compares with the physical shop server.
+- Answer: keep the physical server. With a cloud VM, selling stops whenever the internet is down (the app has no offline mode), the server can no longer be the main cashier (back to a separate cashier PC), and it adds a monthly bill, a public domain and open ports. A cloud VM's strengths (off-site copies, easy remote access) are better used later for **cloud backups** (DEPLOYMENT.md § 12.3). `DEPLOYMENT.md` not changed.
+
+### 2026-10-10: DEPLOYMENT.md updated: the server is also the main cashier
+- Owner decision: the shop server also works as the main cashier, so 4 computers in total (server/main cashier + 3 counter PCs).
+- `docs/DEPLOYMENT.md` changed: design principle, diagram, what-runs-where, shopping list (3 counter PCs, one 1500 VA UPS, printers need Windows **and** Linux drivers, under-counter compartment), server hardware (16 GB minimum, display out, more USB), memory budget, Ubuntu **Desktop** + CUPS, new § 6.3 *Main cashier on the server* (`cashier` user without sudo, auto sign-in on Xorg, `/etc/hosts` → 127.0.0.1, CUPS printer #0, certificate in the cashier's Chrome, GNOME settings, kiosk autostart), printers, IP plan, UPS, HTTPS, security, install steps, deploy note, monitoring and runbook. Docs only, no code changes.
+
+### 2026-10-10: Can the server also be the main cashier? (answer only, no changes)
+- Owner asked whether the shop server can double as the main cashier PC, so fewer computers are needed.
+- Answer: yes, it works (the app has no Windows-only code). Recommended: Ubuntu Desktop on the server, Chrome kiosk for a restricted user, printer #0 via CUPS. The main risk is Sinhala printing on Linux, so test the chosen printer on Linux first. Other costs: the server sits at the counter instead of a locked cabinet, and one bigger UPS covers server + cashier. `DEPLOYMENT.md` not changed yet; waiting for the owner's decision.
 
 ### 2026-10-10: Sidebar account menu animation
 - Owner: animate the popup (My account / My attendance / Clock in-out) opened from the user card at the bottom of the sidebar.

@@ -436,6 +436,15 @@ Name, phone, address, credit terms. The supplier page shows balance, ledger (goo
 
 Partial deliveries: post a GRN for what came; the PO stays *Partly received* until the rest arrives.
 
+**Supplier invoice photo (Owner / Manager, works on a phone).** Every GRN, with a PO or a direct delivery, has a **Supplier invoice** box:
+
+- **Take photo** opens the phone's back camera; **Choose files** picks photos from the gallery or a PDF. Take one photo per invoice page (up to 10 at a time). Tap **×** on a preview to drop it.
+- On the *Receive goods* form the photos are saved with the GRN. On the GRN page tap **Save invoice photos**. You can add photos to a draft or a posted GRN (the bill often arrives later), not to a cancelled one.
+- The phone shrinks each photo before sending it (about 0.5–1 MB, still readable). Tap a thumbnail to open it full size.
+- The files are kept on the shop server, **one folder per supplier**: `storage/app/private/supplier-invoices/<supplier-name>/2026-10-15_GRN-2026-000012_1.jpg`. Suppliers with a Sinhala-only name get `supplier-<id>`. The nightly backup includes them.
+- Removing a photo: the Manager can remove one while the GRN is a draft; after posting, only the Owner can. Every add and remove is in the audit log.
+- The GRN list shows a camera badge with the number of photos.
+
 ### 8.4 Supplier return (Purchasing → Supplier returns)
 
 Choose supplier and the **batch** the goods came from, quantity, reason. Posted on save:
@@ -448,6 +457,20 @@ Numbers: `SRN-…`.
 ### 8.5 Supplier payment (Purchasing → Supplier payments, owner only)
 
 Pay from the drawer, cash at home, a bank transfer, or a **cheque**. The payment is applied to unpaid GRNs oldest first (or as chosen); extra stays as an advance. A cancelled or bounced cheque makes those GRNs unpaid again. Numbers: `SP-…`.
+
+### 8.6 Invoices: a file for each supplier (Purchasing → Invoices, Owner / Manager)
+
+Every supplier has a **folder**. Keep its invoices, bank deposit slips and receipts there, so you can find any paper when you talk to the company.
+
+- The page shows all suppliers as folder squares. Yellow folders hold papers; grey ones are empty. Each square shows how many invoices, deposit slips and receipts it holds and when it was last updated.
+- **Search** by supplier name, contact person or phone; the folders filter as you type (F2 jumps to the search box). **A–Z** or **Recently updated** changes the order.
+- Tap a folder to open it. Use the chips at the top (**All, Invoices, Deposit slips, Receipts, Other**), the year, or search by number, amount, note or GRN number.
+- **Add document**: choose what it is (Invoice, Bank deposit slip, Receipt, Other), the date on the paper, its number and amount (optional), and a note. Then **Take photo** (phone camera) or **Choose files** (photos or PDF). Take one photo per page; pages saved together are kept as one document. Tap **Save document**.
+- Invoice photos taken on a goods receipt (section 8.3) also show in the folder as invoices, with a link to the GRN.
+- Tap a document to open it full size; documents with several pages show **Pages 1 2 3**.
+- Removing: the Owner can remove any document; the Manager only a document they added today (for example a blurred photo). Every add and remove is in the audit log.
+- The files are kept on the shop server in the supplier's folder: `storage/app/private/supplier-invoices/<supplier-name>/invoices/`, `deposit-slips/`, `receipts/`, `other/`. The nightly backup includes them.
+- The supplier's page (Purchasing → Suppliers) has an **Invoices & slips** button that opens the same folder.
 
 ---
 

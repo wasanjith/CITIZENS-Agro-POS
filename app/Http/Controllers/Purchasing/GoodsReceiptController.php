@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Purchasing;
 
+use App\Domain\Purchasing\Actions\AttachSupplierInvoiceAction;
 use App\Domain\Purchasing\Actions\CancelGoodsReceiptAction;
 use App\Domain\Purchasing\Actions\PostGoodsReceiptAction;
 use App\Domain\Purchasing\Actions\SaveGoodsReceiptAction;
@@ -32,7 +33,7 @@ class GoodsReceiptController extends Controller
         $this->authorize('viewAny', GoodsReceipt::class);
 
         $receipts = $this->applyListQuery(
-            GoodsReceipt::query()->with(['supplier', 'purchaseOrder', 'receiver']),
+            GoodsReceipt::query()->with(['supplier', 'purchaseOrder', 'receiver'])->withCount('invoices'),
             $request,
             searchable: ['number', 'supplier_invoice_no'],
             sortable: ['number', 'received_at', 'total'],
@@ -90,13 +91,15 @@ class GoodsReceiptController extends Controller
         return view('purchasing.goods-receipts.form', $this->formData($receipt, $lines, $order));
     }
 
-    public function store(SaveGoodsReceiptRequest $request, SaveGoodsReceiptAction $save, PostGoodsReceiptAction $post): RedirectResponse
+    public function store(SaveGoodsReceiptRequest $request, SaveGoodsReceiptAction $save, PostGoodsReceiptAction $post, AttachSupplierInvoiceAction $attach): RedirectResponse
     {
         $receipt = DB::transaction(function () use ($request, $save, $post): GoodsReceipt {
-            $receipt = $save->handle($request->validated(), $request->user());
+            $receipt = $save->handle($request->receiptData(), $request->user());
 
             return $request->wantsPost() ? $post->handle($receipt, $request->user()) : $receipt;
         });
+
+        $attach->handle($receipt, $request->invoiceFiles(), $request->user());
 
         return redirect()->route('purchasing.goods-receipts.show', $receipt)->with('success', $request->wantsPost()
             ? "{$receipt->number} posted. Stock and the supplier balance are updated."
@@ -107,7 +110,7 @@ class GoodsReceiptController extends Controller
     {
         $this->authorize('view', $goodsReceipt);
 
-        $goodsReceipt->load(['supplier', 'purchaseOrder', 'receiver', 'lines.product.baseUnit', 'lines.product.opensInto', 'lines.variant', 'lines.unit', 'lines.batch', 'packOpenings.looseProduct.baseUnit']);
+        $goodsReceipt->load(['supplier', 'purchaseOrder', 'receiver', 'lines.product.baseUnit', 'lines.product.opensInto', 'lines.variant', 'lines.unit', 'lines.batch', 'packOpenings.looseProduct.baseUnit', 'invoices.uploader']);
 
         return view('purchasing.goods-receipts.show', ['receipt' => $goodsReceipt]);
     }
@@ -134,13 +137,15 @@ class GoodsReceiptController extends Controller
         return view('purchasing.goods-receipts.form', $this->formData($goodsReceipt, $lines, $goodsReceipt->purchaseOrder()->with('lines')->first()));
     }
 
-    public function update(SaveGoodsReceiptRequest $request, GoodsReceipt $goodsReceipt, SaveGoodsReceiptAction $save, PostGoodsReceiptAction $post): RedirectResponse
+    public function update(SaveGoodsReceiptRequest $request, GoodsReceipt $goodsReceipt, SaveGoodsReceiptAction $save, PostGoodsReceiptAction $post, AttachSupplierInvoiceAction $attach): RedirectResponse
     {
         $receipt = DB::transaction(function () use ($request, $goodsReceipt, $save, $post): GoodsReceipt {
-            $receipt = $save->handle($request->validated(), $request->user(), $goodsReceipt);
+            $receipt = $save->handle($request->receiptData(), $request->user(), $goodsReceipt);
 
             return $request->wantsPost() ? $post->handle($receipt, $request->user()) : $receipt;
         });
+
+        $attach->handle($receipt, $request->invoiceFiles(), $request->user());
 
         return redirect()->route('purchasing.goods-receipts.show', $receipt)->with('success', $request->wantsPost()
             ? "{$receipt->number} posted. Stock and the supplier balance are updated."

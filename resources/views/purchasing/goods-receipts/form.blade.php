@@ -26,6 +26,7 @@
 
     <form
         method="POST"
+        enctype="multipart/form-data"
         action="{{ $isNew ? route('purchasing.goods-receipts.store') : route('purchasing.goods-receipts.update', $receipt) }}"
         x-data="goodsReceiptForm({
             lines: @js($lines),
@@ -65,6 +66,17 @@
                 <x-ui.input name="received_at" label="Received" type="datetime-local" :value="$receipt->received_at?->format('Y-m-d\TH:i')" required />
                 <x-ui.textarea name="note" label="Note" :value="$receipt->note" rows="2" class="sm:col-span-2 lg:col-span-4" />
             </div>
+        </x-ui.card>
+
+        <x-ui.card title="Supplier invoice" description="Take a photo of the supplier's invoice (one per page). It is saved in the supplier's folder with this GRN.">
+            @php $attached = $receipt->exists ? $receipt->invoices()->count() : 0; @endphp
+            @if ($attached)
+                <p class="mb-3 text-sm text-gray-600">{{ $attached }} {{ Str::plural('file', $attached) }} already attached. Add more below, or open the GRN to see them.</p>
+            @endif
+            @if ($errors->any())
+                <p class="mb-3 text-sm text-amber-800">Photos are not kept when the form has errors. Please take or choose them again.</p>
+            @endif
+            <x-purchasing.invoice-photos-input name="invoice_files" />
         </x-ui.card>
 
         <x-ui.card title="Goods received" description="Quantities in the unit shown. Free quantity is extra stock the supplier gave at no charge; it lowers the cost per unit.">

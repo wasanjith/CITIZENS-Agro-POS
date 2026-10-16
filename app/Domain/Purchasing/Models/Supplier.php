@@ -16,7 +16,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -77,6 +79,17 @@ class Supplier extends Model implements StockReference
         return BigDecimal::of($this->opening_balance)
             ->plus((string) ($totals->credit ?? '0'))
             ->minus((string) ($totals->debit ?? '0'));
+    }
+
+    /**
+     * Folder on the local disk that holds this supplier's invoice photos and papers, named after
+     * the supplier: supplier-invoices/cic-agri-businesses. Names with no Latin letters (Sinhala)
+     * fall back to supplier-{id}. Papers added in Purchasing → Invoices go in sub-folders
+     * (invoices, deposit-slips, receipts, other).
+     */
+    public function invoiceFolder(): string
+    {
+        return 'supplier-invoices/'.(Str::slug($this->name) ?: 'supplier-'.$this->id);
     }
 
     /**
@@ -161,6 +174,26 @@ class Supplier extends Model implements StockReference
     public function returns(): HasMany
     {
         return $this->hasMany(SupplierReturn::class);
+    }
+
+    /**
+     * Invoices, deposit slips, receipts … in the supplier's file (Purchasing → Invoices).
+     *
+     * @return HasMany<SupplierDocument, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(SupplierDocument::class);
+    }
+
+    /**
+     * Invoice photos attached to this supplier's goods receipts.
+     *
+     * @return HasManyThrough<GoodsReceiptInvoice, GoodsReceipt, $this>
+     */
+    public function goodsReceiptInvoices(): HasManyThrough
+    {
+        return $this->hasManyThrough(GoodsReceiptInvoice::class, GoodsReceipt::class);
     }
 
     /**

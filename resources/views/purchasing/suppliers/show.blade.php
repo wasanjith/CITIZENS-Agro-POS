@@ -13,6 +13,9 @@
         @can('create', \App\Domain\Purchasing\Models\SupplierPayment::class)
             <x-ui.button variant="secondary" :href="route('purchasing.supplier-payments.create', ['supplier' => $supplier->id])">Pay supplier</x-ui.button>
         @endcan
+        @can('viewAny', \App\Domain\Purchasing\Models\SupplierDocument::class)
+            <x-ui.button variant="secondary" :href="route('purchasing.invoices.show', $supplier)">Invoices &amp; slips</x-ui.button>
+        @endcan
         @can('update', $supplier)
             <x-ui.button :href="route('purchasing.suppliers.edit', $supplier)">Edit</x-ui.button>
         @endcan

@@ -4,9 +4,11 @@ namespace App\Http\Requests\Purchasing;
 
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Purchasing\Models\GoodsReceipt;
+use App\Domain\Purchasing\Models\GoodsReceiptInvoice;
 use App\Http\Requests\Concerns\ValidatesProductLines;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -51,6 +53,8 @@ class SaveGoodsReceiptRequest extends FormRequest
             'lines.*.mfg_date' => ['nullable', 'date', 'before_or_equal:today'],
             'lines.*.expiry_date' => ['nullable', 'date'],
             'action' => ['nullable', 'in:save,post'],
+            // Photos / PDFs of the supplier's invoice, saved after the GRN.
+            ...GoodsReceiptInvoice::uploadRules('invoice_files'),
         ];
     }
 
@@ -62,6 +66,8 @@ class SaveGoodsReceiptRequest extends FormRequest
         return [
             'lines.required' => 'Add at least one product.',
             'lines.*.unit_cost.required' => 'Enter the unit cost of every line.',
+            'invoice_files.*.mimes' => 'Invoice files must be photos (JPG, PNG, WebP) or PDF.',
+            'invoice_files.*.max' => 'Each invoice file must be smaller than '.(GoodsReceiptInvoice::MAX_KB / 1024).' MB.',
         ];
     }
 
@@ -100,6 +106,24 @@ class SaveGoodsReceiptRequest extends FormRequest
                 'expiry_date' => ($line['expiry_date'] ?? null) ?: null,
             ], (array) $this->input('lines', []))),
         ]);
+    }
+
+    /**
+     * The GRN fields, without the invoice files.
+     *
+     * @return array<string, mixed>
+     */
+    public function receiptData(): array
+    {
+        return $this->safe()->except(['invoice_files']);
+    }
+
+    /**
+     * @return list<UploadedFile>
+     */
+    public function invoiceFiles(): array
+    {
+        return array_values(array_filter((array) $this->file('invoice_files', []), fn ($file) => $file instanceof UploadedFile));
     }
 
     public function wantsPost(): bool
