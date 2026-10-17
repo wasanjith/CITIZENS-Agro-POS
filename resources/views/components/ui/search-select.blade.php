@@ -9,8 +9,9 @@
 @endphp
 
 <div
-    x-data="searchSelect({ url: @js($url), value: @js(old($name, $value)), label: @js($valueLabel) })"
+    x-data="searchSelect({ url: @js($url), name: @js($name), value: @js(old($name, $value)), label: @js($valueLabel) })"
     @click.outside="open = false"
+    @search-select-set.window="set($event.detail)"
     {{ $attributes->only('class')->merge(['class' => 'relative']) }}
 >
     @if ($label)

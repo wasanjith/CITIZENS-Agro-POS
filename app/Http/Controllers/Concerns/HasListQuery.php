@@ -14,7 +14,7 @@ trait HasListQuery
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
      * @param  Builder<TModel>  $query
-     * @param  list<string>  $searchable  columns matched with LIKE
+     * @param  list<string>  $searchable  columns matched with LIKE ("relation.column" for a related model)
      * @param  list<string>  $sortable  columns allowed in ?sort=
      * @param  array<string, callable(Builder<TModel>, string): void>  $filters  ?filter[name]=value handlers
      * @return Builder<TModel>
@@ -33,7 +33,12 @@ trait HasListQuery
         if ($search !== '' && $searchable !== []) {
             $query->where(function (Builder $inner) use ($searchable, $search): void {
                 foreach ($searchable as $column) {
-                    $inner->orWhere($column, 'like', '%'.$search.'%');
+                    if (str_contains($column, '.')) {
+                        [$relation, $relationColumn] = explode('.', $column, 2);
+                        $inner->orWhereRelation($relation, $relationColumn, 'like', '%'.$search.'%');
+                    } else {
+                        $inner->orWhere($column, 'like', '%'.$search.'%');
+                    }
                 }
             });
         }

@@ -1,12 +1,14 @@
 {{--
     Product search for line editors. Dispatches `product-picked` with the search item.
     <div x-data="…" @product-picked="addLine($event.detail)"><x-ui.product-picker /></div>
+    :supplier="true" (purchase orders): only the chosen supplier's products, see product-picker.js.
 --}}
-@props(['label' => 'Add product', 'placeholder' => 'Search by code, name, Sinhala name or alias (F2)'])
+@props(['label' => 'Add product', 'placeholder' => 'Search by code, name, Sinhala name, alias or brand (F2)', 'supplier' => false, 'supplierId' => null, 'supplierName' => ''])
 
 <div
-    x-data="productPicker({ url: @js(route('api.pos.search')) })"
+    x-data="productPicker({ url: @js(route('api.pos.search')), supplier: @js((bool) $supplier), supplierId: @js($supplierId), supplierName: @js($supplierName) })"
     @click.outside="open = false"
+    @picker-supplier.window="setSupplier($event.detail)"
     {{ $attributes->merge(['class' => 'relative']) }}
 >
     <label for="product-picker" class="block text-sm font-medium text-gray-700">{{ $label }}</label>
@@ -17,7 +19,7 @@
         x-model="query"
         x-hotkey.f2="$el.focus(); $el.select()"
         @input.debounce.150ms="search()"
-        @focus="items.length && (open = true)"
+        @focus="items.length ? (open = true) : (filtersBySupplier && search())"
         @keydown.arrow-down.prevent="move(1)"
         @keydown.arrow-up.prevent="move(-1)"
         @keydown.enter.prevent="pick()"
@@ -37,11 +39,19 @@
                 <span class="min-w-0">
                     <span class="font-mono text-xs font-semibold text-brand-700" x-text="item.short_code"></span>
                     <span class="font-medium text-gray-900" x-text="item.name"></span>
+                    <span x-show="item.brand" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700" x-text="item.brand"></span>
                     <span class="block truncate font-sinhala text-xs text-gray-500" x-text="item.name_si"></span>
                 </span>
                 <span class="whitespace-nowrap text-xs tabular text-gray-600" x-text="stockText(item)"></span>
             </li>
         </template>
-        <li x-show="items.length === 0" class="px-3 py-2 text-gray-500">No products found.</li>
+        <li x-show="items.length === 0" class="px-3 py-2 text-gray-500" x-text="emptyText()"></li>
     </ul>
+    @if ($supplier)
+        <label x-show="supplierId" x-cloak class="mt-2 flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" x-model="onlySupplier" @change="items = []; open = false; $refs.input.focus()" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+            <span>Only <span class="font-medium" x-text="supplierName || 'this supplier'"></span>'s products</span>
+        </label>
+        <p x-show="! supplierId" class="mt-2 text-xs text-gray-500">Choose the supplier to see only the products they supply.</p>
+    @endif
 </div>

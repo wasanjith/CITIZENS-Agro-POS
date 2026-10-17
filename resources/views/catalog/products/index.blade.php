@@ -13,7 +13,7 @@
         @endcan
     </x-ui.page-header>
 
-    <x-ui.filter-bar :action="route('catalog.products.index')" placeholder="Code, name, Sinhala name or alias" class="mb-4">
+    <x-ui.filter-bar :action="route('catalog.products.index')" placeholder="Code, name, Sinhala name, alias or brand" class="mb-4">
         <x-ui.select name="filter[category]" :options="$categories" :value="request('filter.category')" placeholder="All categories" />
         <x-ui.select name="filter[brand]" :options="$brands" :value="request('filter.brand')" placeholder="All brands" />
         <x-ui.select name="filter[status]" :options="['active' => 'Active', 'inactive' => 'Inactive']" :value="request('filter.status')" placeholder="Any status" />

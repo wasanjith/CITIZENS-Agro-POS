@@ -34,7 +34,7 @@
                     @keydown.enter.prevent="chooseHighlighted()"
                     type="search"
                     autocomplete="off"
-                    placeholder="Code, name, සිංහල, 5*urea … (F2)"
+                    placeholder="Code, name, brand, සිංහල, 5*urea … (F2)"
                     class="block w-full rounded-md border-gray-300 py-3 pl-3 pr-10 text-lg focus:border-brand-500 focus:ring-brand-500"
                 >
                 <span x-show="searching" class="absolute right-3 top-3.5 text-xs text-gray-400">…</span>
@@ -42,6 +42,17 @@
             <div class="mt-2 flex flex-wrap gap-1 text-xs font-medium">
                 <template x-for="item in [{ key: 'search', label: 'Results' }, { key: 'favorites', label: 'Favourites' }, { key: 'recent', label: 'Recent' }, { key: 'category', label: 'Categories' }]" :key="item.key">
                     <button type="button" @click="showTab(item.key)" :class="tab === item.key ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'" class="rounded-md px-3 py-1.5" x-text="item.label"></button>
+                </template>
+            </div>
+            {{-- Brand suggestions: the same item from several companies, narrowed to one. --}}
+            <div x-show="tab === 'search' && query.trim() !== '' && brands.length > 0" x-cloak class="mt-2 flex flex-wrap items-center gap-1 text-xs">
+                <span class="text-gray-500">Brand:</span>
+                <button type="button" @click="filterBrand(null)" :class="brandId === null ? 'bg-brand-100 text-brand-800 ring-brand-300' : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'" class="rounded-md px-2.5 py-1 ring-1">All</button>
+                <template x-for="brand in brands" :key="brand.id">
+                    <button type="button" @click="filterBrand(brand.id)" :class="brandId === brand.id ? 'bg-brand-100 text-brand-800 ring-brand-300' : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'" class="rounded-md px-2.5 py-1 ring-1">
+                        <span x-text="brand.name"></span>
+                        <span class="tabular text-gray-500" x-text="brand.count"></span>
+                    </button>
                 </template>
             </div>
             <div x-show="tab === 'category'" x-cloak class="mt-2 flex flex-wrap gap-1">
@@ -69,6 +80,7 @@
                         <div class="min-w-0">
                             <span class="font-mono text-xs font-semibold text-brand-700" x-text="item.short_code"></span>
                             <span class="font-medium" x-text="item.name"></span>
+                            <span x-show="item.brand" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700" x-text="item.brand"></span>
                             <p class="truncate font-sinhala text-sm text-gray-600" x-text="item.name_si"></p>
                         </div>
                         <div class="shrink-0 text-right">

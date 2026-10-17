@@ -110,25 +110,244 @@ The cashier's Chrome uses the **same** `https://pos.citizens.local` address as e
 
 ## 3. Shopping list (bill of materials)
 
-| # | Item | Qty | Minimum spec | Notes |
-|---|---|---|---|---|
-| 1 | **Shop server = main cashier** (self-built desktop) | 1 | see [§ 4.1.1](#411-parts-list-self-built-server) | Assembled from parts: i5 with integrated graphics, 16–32 GB RAM, NVMe SSD with DRAM cache, backup HDD, quality PSU |
-| 2 | **Counter PCs** | 3 | see [§ 6](#6-terminal-pcs) | Mini PCs or all-in-ones. No separate main cashier PC (the server is the cashier) |
-| 3 | **Monitors** (if not all-in-one) | 4 | 21.5–24" 1920×1080 | Server/main cashier: **24" 1920×1080** (Live Billing shows 3 columns); counters 21.5" |
-| 4 | Keyboard + mouse | 4 | Wired USB | Spill-resistant keyboards; counters work mostly by keyboard (F2/F4/F6/F8/F9) |
-| 5 | **80 mm thermal printers** | 4 + **1 spare** | USB, **Windows _and_ Linux (CUPS) driver**, 203 dpi, auto-cutter, RJ11 drawer port | All the **same model**; choose it only after the Sinhala print test passes on **both** Windows and Ubuntu ([§ 7](#7-printers-and-cash-drawer), [PRINTING.md](PRINTING.md)) |
-| 6 | **Cash drawer** | — | **Keep the existing manual drawer** (about one more year) | Later: RJ11/RJ12 printer-driven, 24 V, 5 note / 8 coin, matching the printer's drawer port. See [§ 7](#7-printers-and-cash-drawer) |
-| 7 | **UPS for the server/main cashier** | 1 | Line-interactive, **1500 VA**, **USB/HID shutdown port** | Powers server, 24" monitor, printer #0, switch, router |
-| 8 | UPS for the counters (recommended) | 1–3 | 650 VA each | Optional: carts survive anyway, but staff can finish printing |
-| 9 | **Gigabit switch** | 1 | 8-port unmanaged | 4 wired machines + router + spare ports |
-| 10 | Router | 1 | Existing ISP fibre/4G router | Must allow a **DHCP reservation** or static IPs |
-| 11 | Network cable | — | Cat6, patch cables | All terminals **wired**, never Wi-Fi |
-| 12 | **Backup hard disk** | 1 | **1–2 TB HDD**, inside the server (2.5"/3.5" bay) or a USB 3 disk left plugged in | Holds all backups ([§ 12](#12-backups)). Cloud storage is added later |
-| 13 | Paper rolls | stock | 80 mm × 80 m thermal | Keep at least 1 month of rolls |
-| 14 | Webcam (optional) | 1–4 | 720p USB | Only if "clock-in photo" is switched on (Settings → HR) |
-| 15 | **Under-counter server compartment** | 1 | Ventilated, lockable door, raised off the floor | The server sits **at the cashier counter** now: box + UPS inside, only monitor/keyboard/mouse/printer cables come out. Away from water, agro-chemical dust and feet. Switch and router can go here or on a wall shelf |
+Everything the shop needs to run the POS, grouped by type, with the capacity to ask for when buying. "Minimum" works; **Recommended** is what to buy if the price difference is small. Model names are examples of the right class: any known brand with the same numbers is fine. Ask every shop for a **Sri Lankan warranty** (at least 1 year, 3 years for PCs and UPS).
 
-**Not needed:** a separate main cashier PC, barcode scanners (the shop uses short codes and search), a customer display, or a cloud server.
+Mains power in Sri Lanka is **230 V, 50 Hz**, sockets **BS 1363 (square 3-pin, 13 A)** or the older round-pin type. Check that every power cable and UPS outlet matches the shop's sockets before buying.
+
+### 3.1 Everything at a glance
+
+| # | Item | Qty | Capacity to ask for | Details |
+|---|---|---|---|---|
+| 1 | **Shop server = main cashier** (self-built) | 1 | i5-12400 class, 16–32 GB RAM (2 sticks), 1 TB NVMe with DRAM cache, 2 TB HDD | [§ 4.1.1](#411-parts-list-self-built-server) |
+| 2 | **Counter PCs** (business mini PC) | 3 | i3 / N100 class, 8–16 GB RAM, 256 GB NVMe, wired gigabit LAN | [§ 3.2](#32-computers) |
+| 3 | **Monitors** | 4 | 1 × 24" + 3 × 21.5", 1920×1080 IPS, HDMI, VESA 100 | [§ 3.3](#33-screens-keyboards-and-mice) |
+| 4 | Keyboard + mouse sets | 4 + 1 spare | Wired USB, full size with number pad, spill-resistant | [§ 3.3](#33-screens-keyboards-and-mice) |
+| 5 | **80 mm thermal printers** | 4 + **1 spare** | 203 dpi, ≥ 250 mm/s, auto-cutter, USB, Windows **and** Linux driver, RJ11 drawer port | [§ 3.4](#34-printers-paper-and-cash-drawer) |
+| 6 | Thermal paper rolls | 1 box of 50 to start | 80 mm × **80 m**, 55–60 gsm, BPA-free | [§ 3.4](#34-printers-paper-and-cash-drawer) |
+| 7 | Cash drawer | — | **Keep the existing manual drawer** (about one more year) | [§ 3.4](#34-printers-paper-and-cash-drawer) |
+| 8 | **Network switch** | 1 | 8 × gigabit ports, metal, fanless, "easy smart" (VLAN) | [§ 3.5](#35-network) |
+| 9 | **Network cable** | ~100–150 m (measure) | **Cat6 U/UTP, 23 AWG solid pure copper** (no CCA) | [§ 3.5](#35-network) |
+| 10 | Patch panel, wall jacks, patch cords | see § 3.5 | Cat6 rated | [§ 3.5](#35-network) |
+| 11 | Wall network cabinet | 1 | 6U, 450 mm deep, glass door, lock | [§ 3.5](#35-network) |
+| 12 | Router | 1 | Existing ISP router with DHCP reservation | [§ 3.5](#35-network) |
+| 13 | **UPS A** (server, cashier, network) | 1 | **1500 VA / 900 W, pure sine wave**, line-interactive, AVR, USB | [§ 3.6](#36-power-ups-sockets-and-surge) |
+| 14 | **UPS B** (one per counter) | 3 | 650–850 VA / 360–480 W, line-interactive, AVR | [§ 3.6](#36-power-ups-sockets-and-surge) |
+| 15 | Electrical work | — | Earth check, surge protector at the DB, sockets at each counter | [§ 3.6](#36-power-ups-sockets-and-surge) |
+| 16 | **Under-counter server compartment** | 1 | Ventilated, lockable, raised off the floor | [§ 3.7](#37-furniture-and-installation-materials) |
+| 17 | Monitor mounts / cable trunking / labels | — | VESA 100 | [§ 3.7](#37-furniture-and-installation-materials) |
+| 18 | Spares and tools | — | — | [§ 3.8](#38-spares-and-tools) |
+| 19 | Webcam (optional) | 0–4 | 720p USB | Only if "clock-in photo" is switched on (Settings → HR) |
+
+**What sits where**
+
+| Place | Equipment |
+|---|---|
+| **Cashier counter** | Server (in the compartment) · 24" monitor · keyboard + mouse · printer #0 · manual cash drawer · UPS A |
+| Wall above / next to the cashier counter | Network cabinet: patch panel, switch, ISP router, power strip fed from UPS A |
+| **Counter 1, 2, 3** (each) | Mini PC (on the back of the monitor) · 21.5" monitor · keyboard + mouse · printer #1/#2/#3 · UPS B · network wall jack |
+| Store room shelf | Spare printer, spare keyboard + mouse, paper stock, spare patch cords |
+
+### 3.2 Computers
+
+**Shop server = main cashier (×1):** the full parts list and BIOS settings are in [§ 4.1.1](#411-parts-list-self-built-server). In short: Intel Core i5-12400/13400/14400 (built-in graphics, not an "F" model), tower cooler, B660/B760 micro-ATX board, **2 × 8 GB or 2 × 16 GB** RAM, **1 TB NVMe with DRAM cache**, **2 TB CMR HDD** for backups, **550 W 80 Plus Bronze/Gold** PSU, micro-ATX case with dust filters and 3 fans, no graphics card.
+
+**Counter PCs (×3):** business mini PCs, fixed to the back of the monitor. They only run Chrome, so they do not need much, but they run all day in a hot, dusty shop.
+
+| Part | Minimum | **Recommended** |
+|---|---|---|
+| Type | Mini PC | **Business mini PC**: Lenovo ThinkCentre M70q / M75q Tiny, HP Pro Mini 400, Dell OptiPlex Micro |
+| CPU | Intel N100 (4 cores) | **Intel Core i3-1215U / i3-12100T / i5-12500T**, or AMD Ryzen 3/5 PRO |
+| RAM | 8 GB | **16 GB** (2 × 8 GB where the PC has two slots) |
+| Disk | 256 GB SSD | **256–512 GB NVMe SSD** |
+| Network | **Wired gigabit RJ45** (Intel or Realtek) | Same. Wi-Fi is not used at the counters |
+| Ports | 4 × USB, 1 × HDMI | 6 × USB (printer, keyboard, mouse, webcam, spare), HDMI or DisplayPort |
+| Power | External adapter, 65 W | Same (uses 15–35 W) |
+| Mounting | VESA 100 bracket | Bracket included with the PC |
+| OS | **Windows 11 Pro**, genuine licence | Same |
+| Warranty | 1 year | 3 years on-site |
+
+Avoid: no-name mini PCs without a local warranty, models with only Wi-Fi (no RJ45), and Windows 11 Home (no proper user lock-down).
+
+**Back-office:** the owner's / manager's existing laptop and phone are enough (browser only, Wi-Fi or Tailscale). Nothing to buy.
+
+### 3.3 Screens, keyboards and mice
+
+| Item | Qty | Capacity | Examples |
+|---|---|---|---|
+| **24" monitor** (cashier, on the server) | 1 | **1920×1080 IPS**, 60–75 Hz, HDMI + DP, anti-glare, **VESA 100**, tilt stand, ~20 W | Dell P/SE24, HP 24, LG 24MP, Samsung 24" business |
+| **21.5"–22" monitor** (counters) | 3 | 1920×1080 IPS, HDMI, anti-glare, VESA 100, ~15 W | Same brands, 22" models |
+| HDMI cable | 4 | HDMI 1.4 or newer, 1.5 m | If not in the monitor box |
+| **Keyboard** | 4 + 1 spare | **Wired USB**, full size with **F-keys and number pad** (staff use F2/F4/F6/F8/F9 and type quantities), spill-resistant | Logitech K120, Dell KB216, HP 125 |
+| Mouse | 4 + 1 spare | Wired USB optical | Logitech B100 / M90 |
+| Keyboard cover (optional) | 4 | Clear silicone cover for the model bought | Keeps out fertiliser and chemical dust |
+
+No wireless keyboards or mice: batteries run out and they interfere with each other at close counters.
+
+### 3.4 Printers, paper and cash drawer
+
+**80 mm thermal receipt printers: 4 in use + 1 spare, all the same model.**
+
+| Capacity | Minimum | **Recommended** |
+|---|---|---|
+| Print method / resolution | Direct thermal, **203 dpi** | Same |
+| Paper width | **80 mm** (72 mm print width) | Same |
+| Print speed | 200 mm/s | **250–300 mm/s** |
+| Auto-cutter | Partial cut, 1 million cuts | **Partial cut, ≥ 1.5 million cuts** |
+| Print head life | 100 km | **150 km** |
+| Roll size | Up to Ø 80 mm | **Up to Ø 83 mm** (takes 80 m rolls) |
+| Interface | **USB** | USB + Ethernet (Ethernet not used now, useful later) |
+| Drivers | **Windows 10/11 and Linux (CUPS) for Ubuntu 24.04** | Maker's own drivers for both |
+| Cash drawer port | **RJ11/RJ12, 24 V** | Same (for the drawer later) |
+| Power | 24 V DC adapter (~2.5 A) | Adapter included, with a UK-plug cable |
+
+Examples to test first: **Epson TM-T82III / TM-T20III** (Linux CUPS driver from Epson), **Bixolon SRP-330III / SRP-350V**. Cheaper Xprinter / Rongta models also work on Windows, but check their Linux driver carefully. **Buy one, run the Sinhala print test on Windows and on Ubuntu ([§ 7](#7-printers-and-cash-drawer), [PRINTING.md](PRINTING.md)), and only then buy the other four.**
+
+**Paper:**
+
+| Item | Capacity | How much |
+|---|---|---|
+| Thermal rolls | **80 mm × 80 m**, core 12 mm, 55–60 gsm, BPA-free, from one supplier | Estimate: ~300 invoices × ~20 cm + cashier receipts ≈ **one 80 m roll a day for the whole shop**, about 30 a month. Start with **one box of 50**, keep at least one month in stock |
+
+Many rolls sold as "80 mm" are only 50 m or 70 m long. Check the length on the box: a longer roll means fewer changes during busy hours.
+
+**Cash drawer:** keep the **existing manual drawer** for about one more year (owner, 2026-10-09). When it is replaced: printer-driven, **RJ11/RJ12, 24 V**, 5 note / 8 coin slots, metal, 3-position key lock, about 410 mm wide, plugged into printer #0 ([§ 7](#7-printers-and-cash-drawer)).
+
+### 3.5 Network
+
+**How it is wired:** every PC has its own cable to the switch. The switch, ISP router and patch panel sit in one small wall cabinet near the cashier counter, so UPS A can power all of them. Counters are wired with solid Cat6 cable in trunking to a wall jack under each counter; short patch cords connect the PC to the jack and the patch panel to the switch.
+
+```
+Counter 1 PC ─2 m cord─ wall jack ═══ Cat6 solid in trunking ═══ patch panel ─0.5 m─┐
+Counter 2 PC ─2 m cord─ wall jack ═══════════════════════════════ patch panel ─0.5 m─┤
+Counter 3 PC ─2 m cord─ wall jack ═══════════════════════════════ patch panel ─0.5 m─┼─ SWITCH ─0.5 m─ ISP router
+Server (under the cashier counter) ────── 2–3 m Cat6 patch cord ────────────────────┘
+```
+
+**Switch (×1)**
+
+| Capacity | Minimum | **Recommended** |
+|---|---|---|
+| Ports | 8 × 10/100/1000 Mbps RJ45 | **8 × gigabit** (5 used: server, 3 counters, router; 3 spare) |
+| Switching capacity | 16 Gbps | 16 Gbps, 11.9 Mpps |
+| Type | Unmanaged | **"Easy smart" / web-managed**: VLANs (to keep guest Wi-Fi apart), port statistics and cable test (finds a bad cable), loop prevention |
+| Build | Metal case, fanless | Same, wall-mountable |
+| Power | ~5 W | Same, on UPS A |
+| Examples | TP-Link TL-SG108, D-Link DGS-108 | **TP-Link TL-SG108E**, Netgear GS308E, D-Link DGS-1100-08V2 |
+
+Gigabit is far more than the POS needs (each terminal uses well under 1 Mbps), so 2.5 GbE or 10 GbE switches only add cost. **PoE is not needed**, unless a ceiling Wi-Fi access point is added later: then buy the PoE version (TL-SG108PE: 4 PoE ports, 64 W). If CCTV, more counters or other devices are planned, buy a **16-port** switch now.
+
+**Cable and connectors**
+
+| Item | Qty | Capacity |
+|---|---|---|
+| **Cat6 cable, solid** (for the runs in trunking) | Measure every route, add 20 % + 3 m at each end. A small shop is usually **100–150 m**; buy a 305 m box only if more than ~150 m is needed | **Cat6 U/UTP, 23 AWG solid bare copper**, 250 MHz, PVC or **LSZH** jacket. 1 Gbps up to **90 m** per run (+ 10 m patch cords). Brands: CommScope (AMP), Panduit, Legrand, D-Link, Dintek |
+| Spare runs | **2 cables to each counter** | Pull a second cable while the trunking is open. Cable is cheap; pulling it again later is not |
+| Wall faceplate + Cat6 keystone jacks | 3 faceplates (dual), 6 jacks | Cat6 rated, 1 faceplate per counter |
+| **Cat6 patch panel** | 1 | 12-port, 1U, Cat6 (keystone or punch-down) |
+| Cat6 patch cords, factory-made | 6 × 0.5 m, 4 × 2 m, 1 × 3 m (server), + 2 spare × 2 m | **Moulded, stranded, snagless boots**, from the same brand as the cable. Do not hand-crimp cords |
+| PVC trunking / conduit | As measured | 25 × 16 mm or larger, with bends and screws. Data cable in its **own** trunking, at least **30 cm away from power cables** where they run side by side |
+| Velcro straps, cable labels | 1 pack each | Label both ends of every cable: `C1-A`, `C1-B`, `C2-A` … |
+
+**Do not buy CCA cable** ("copper-clad aluminium", often sold cheap as "Cat6"). Scrape a wire: CCA is silver under the copper colour. It breaks easily, gets hot and causes random drop-outs. Cat6A, shielded (F/UTP) or fibre cable is not needed inside a shop.
+
+Any cable that goes **outside** or between buildings: outdoor (PE jacket, UV-proof) Cat6 inside conduit. Better still, avoid outdoor runs.
+
+**Network cabinet (×1)**
+
+| Item | Capacity |
+|---|---|
+| Wall-mount cabinet | **6U, 600 mm wide × 450 mm deep**, glass front door with lock, side vents (fan optional) |
+| 1U shelf | For the ISP router |
+| 1U cable manager | Optional, keeps patch cords tidy |
+| Power strip (PDU) | 4–6 sockets, fed from **one battery-backed outlet of UPS A** |
+
+A cabinet keeps the switch and router away from dust, water and staff. On a tight budget, a high wall shelf is acceptable.
+
+**Router and Wi-Fi**
+
+| Item | Capacity |
+|---|---|
+| **ISP router** (existing SLT fibre / 4G router) | **DHCP reservation** (or static IPs), local DNS entry if possible ([§ 8.2](#82-name-resolution-poscitizenslocal)), at least 1 free LAN port, guest Wi-Fi that cannot reach the shop LAN, **no port forwarding**. On UPS A |
+| Wi-Fi access point (optional) | Only if the router's Wi-Fi does not reach the office: ceiling Wi-Fi 6 access point (TP-Link Omada EAP610 / EAP225 class), PoE, with a separate guest network. Used by laptops and phones only, **never by terminals** |
+| Internet speed | Any working connection. The POS sells with **no internet at all**; the internet is only for the owner's remote view and Tailscale |
+
+### 3.6 Power: UPS, sockets and surge
+
+**UPS A: server, cashier screen, printer #0, switch, router (×1)**
+
+| Capacity | Minimum | **Recommended** |
+|---|---|---|
+| Rating | 1500 VA / 865–900 W | **1500 VA / 900 W** |
+| Type | Line-interactive with **AVR** (fixes low/high voltage without using the battery) | Same |
+| Output wave | Simulated sine | **Pure sine wave**. Modern "80 Plus" PSUs with active PFC can switch off on a simulated-sine UPS at the moment the power fails |
+| Shutdown port | **USB (HID)** that works with NUT on Linux | Same + LCD showing load and battery |
+| Battery-backed outlets | 4 | 6 or more (server, monitor, printer #0, cabinet power strip) |
+| Battery | 2 × 12 V 9 Ah, **user-replaceable** | Same. **Replace every 2–3 years** (heat shortens battery life) |
+| Examples | APC Back-UPS BX1500MI, CyberPower UT1500EG | **APC Back-UPS Pro BR1500MI**, **CyberPower CP1500EPFCLCD** (PFC Sinewave) |
+
+**UPS A load:**
+
+| Device | Normal | Peak |
+|---|---|---|
+| Server (i5, SSD, HDD) | 60–80 W | 150 W |
+| 24" monitor | 20 W | 25 W |
+| Printer #0 | 5 W | 60 W (while printing) |
+| Switch | 5 W | 5 W |
+| ISP router | 10 W | 15 W |
+| **Total** | **≈ 110 W (12 % of 900 W)** | **≈ 255 W (28 %)** |
+
+At that load a 1500 VA UPS runs **about 30–45 minutes** (about 20 minutes at peak). The server is set to shut down after 10 minutes on battery or at 30 % battery ([§ 9](#9-power-ups)), so there is plenty of margin even when the battery is older.
+
+**UPS B: one per counter (×3)**
+
+| Capacity | Minimum | **Recommended** |
+|---|---|---|
+| Rating | 650 VA / 360 W | **750–850 VA / 410–480 W** |
+| Type | Line-interactive with AVR | Same, simulated sine is fine (mini PCs use an external adapter) |
+| Outlets | 3 battery-backed | 4 |
+| Examples | APC BX650MI, CyberPower UT650EG | **APC BX750MI / BX850MI**, CyberPower VP700ELCD |
+| Load per counter | Mini PC 15–35 W + 22" monitor 15 W + printer 5 W (60 W printing) ≈ **50 W normal, ~110 W peak** | Runs about **20–30 minutes**: enough to finish and print the bill in hand |
+
+One small UPS per counter is cheaper to wire than one big shared UPS, and one failing does not stop the others.
+
+**Electrical work (by an electrician, before the equipment arrives)**
+
+| Item | Capacity |
+|---|---|
+| **Earth check** | Test the shop's earth; fix it if poor. UPS AVR, surge protection and printer static protection all rely on a good earth |
+| **Surge protection device (SPD)** at the main distribution board | **Type 2 SPD** (230 V, 20–40 kA). Sri Lanka has frequent lightning; this protects everything, not only the POS |
+| Cashier counter circuit | A **dedicated 13 A circuit** (own breaker) with 2 earthed sockets for UPS A, not shared with water pumps, motors, freezers or kettles |
+| Each counter | 1 earthed 13 A double socket for UPS B |
+| Wall cabinet | Fed from UPS A (no separate socket needed; a socket nearby is handy for tools) |
+
+Do not plug UPS units into extension boards or into each other. Do not plug kettles, fans, phone chargers or heaters into any UPS.
+
+### 3.7 Furniture and installation materials
+
+| Item | Qty | Capacity |
+|---|---|---|
+| **Under-counter server compartment** | 1 | Holds the server + UPS A. **Ventilated** (vents or a fan at the back), **lockable** door, raised at least 10 cm off the floor, **10 cm free** behind and at the sides of the server. Away from water, agro-chemical dust and feet |
+| Monitor mount / arm (optional) | 0–4 | VESA 100, if the counter top is small. The counter mini PCs mount behind the monitor with their own bracket |
+| Printer place | 4 | Flat, dry spot next to each monitor, paper exit facing the staff, not under a water tap or fan |
+| Cable trunking, clips, Velcro | As measured | See [§ 3.5](#35-network) |
+| Cable labels | 1 pack | Label every power, USB and network cable at both ends |
+
+### 3.8 Spares and tools
+
+| Item | Qty | Why |
+|---|---|---|
+| **Spare thermal printer** (same model) | 1 | Swap in minutes ([§ 7](#7-printers-and-cash-drawer)) |
+| Spare keyboard + mouse | 1 set | Most common thing to break at a counter |
+| Spare Cat6 patch cords (2 m) | 2 | |
+| Spare USB printer cable (A–B, 1.5 m) | 1 | |
+| Spare HDMI cable | 1 | |
+| Ubuntu install USB stick | 1 × 16 GB | Rebuilding the server ([§ 15](#15-first-install-step-by-step)) |
+| Network cable tester | 1 | Installer: test every run after fitting the jacks. Can be borrowed |
+| Punch-down tool | 1 | Installer, for keystone jacks / patch panel |
+
+### 3.9 Not needed
+
+A separate main cashier PC (the server is the cashier), a graphics card, barcode scanners (the shop uses short codes and search), a customer display, a cloud server, a NAS, 2.5/10 GbE network gear, Wi-Fi for terminals, or a generator for the POS (the UPS covers the shutdown; the shop's own generator, if any, should feed the UPS, not replace it).
 
 ---
 
@@ -166,9 +385,9 @@ The owner is assembling the server from parts (2026-10-11). This list is sized s
 | 10 | **Graphics card** | **None** | **None** | Built-in graphics run the 24" cashier screen. A graphics card only adds heat, power and Linux driver trouble |
 | 11 | **24" monitor** | 24" **1920×1080** IPS, HDMI | Same, with a VESA mount or a stand that tilts | Live Billing shows 3 columns + settle cards. Bring an HDMI/DP cable if the monitor has none |
 | 12 | Keyboard + mouse | Wired USB | Spill-resistant wired keyboard | No wireless (batteries, interference) |
-| 13 | **UPS** | 1500 VA line-interactive with **USB** port | APC Back-UPS / CyberPower 1500 VA | Powers server, monitor, printer #0, switch, router; USB cable to the server for clean shutdown ([§ 9](#9-power-ups)) |
+| 13 | **UPS** | 1500 VA line-interactive with **USB** port | **1500 VA / 900 W pure sine wave** (APC Back-UPS Pro BR1500MI, CyberPower CP1500EPFCLCD) | Powers server, monitor, printer #0, switch, router; USB cable to the server for clean shutdown ([§ 3.6](#36-power-ups-sockets-and-surge), [§ 9](#9-power-ups)) |
 | 14 | Install USB stick | 8 GB | 16 GB USB 3 | For the Ubuntu Desktop 24.04 installer; remove it after installing |
-| 15 | Cat6 patch cable | 1 | 2 m | Server → switch |
+| 15 | Cat6 patch cable | 1 | 2–3 m, factory-made | Server → switch ([§ 3.5](#35-network)) |
 
 **Already counted elsewhere:** thermal printer #0 ([§ 7](#7-printers-and-cash-drawer)), webcam (optional).
 
@@ -268,10 +487,11 @@ There are **3 counter PCs** (Windows). The main cashier has no PC of its own: it
 
 | Part | Counter PC |
 |---|---|
-| CPU | Intel i3 / Ryzen 3 (or newer Celeron N100-class) |
-| RAM | 8 GB |
-| Disk | 128–256 GB SSD |
-| Screen | 21.5" 1920×1080 |
+| Type | Business mini PC on the back of the monitor (full spec: [§ 3.2](#32-computers)) |
+| CPU | Intel i3 12th gen+ / Ryzen 3 (Intel N100 minimum) |
+| RAM | 8 GB minimum, 16 GB recommended |
+| Disk | 256 GB NVMe SSD |
+| Screen | 21.5–22" 1920×1080 IPS |
 | Network | **Wired Gigabit** |
 | USB | Printer + keyboard + mouse (+ webcam) |
 | OS | Windows 10/11 Pro |
@@ -402,8 +622,10 @@ Every device must resolve `pos.citizens.local` → `192.168.10.10` (the server i
 
 | UPS | Powers | Size | Runtime target |
 |---|---|---|---|
-| **UPS A** | Server (= main cashier), its 24" monitor, printer #0, switch, router | **1500 VA** line-interactive, USB/HID | ≥ 20 min for the server; the cashier can keep settling while it runs |
-| UPS B (optional) | Counter PCs | 650 VA each, or one shared | ≥ 5 min |
+| **UPS A** | Server (= main cashier), its 24" monitor, printer #0, switch, router | **1500 VA / 900 W**, pure sine wave, line-interactive with AVR, USB/HID | ≥ 20 min for the server (about 30–45 min at the normal ~110 W load); the cashier can keep settling while it runs |
+| UPS B (recommended) | One per counter: PC, monitor, printer | 650–850 VA line-interactive with AVR, one each | ≥ 5 min (about 20–30 min at ~50 W) |
+
+Load calculation, models and the electrical work (earth, surge protector, dedicated circuit): [§ 3.6](#36-power-ups-sockets-and-surge).
 
 Thermal printers draw a short high current when printing; plug printer #0 into a **battery-backed** socket of UPS A (not a surge-only socket) and check the load stays under ~60 % of the UPS rating.
 

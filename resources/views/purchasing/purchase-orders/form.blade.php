@@ -32,12 +32,15 @@
             lines: @js($lines),
             canCost: @js($canCost),
             supplierId: @js(old('supplier_id', $order->supplier_id)),
+            supplierName: @js($supplierName),
             discount: @js((string) old('discount', $canCost ? $order->discount : '')),
             tax: @js((string) old('tax', $canCost ? $order->tax : '')),
             suggestionsUrl: @js(route('purchasing.purchase-orders.suggestions')),
         })"
         @product-picked="addLine($event.detail)"
-        @search-select-changed="supplierId = $event.detail.id"
+        @search-select-changed="supplierChanged($event.detail)"
+        @search-select-cleared="supplierChanged({ id: null, label: '' })"
+        @product-created.window="addLine($event.detail)"
         class="space-y-6"
     >
         @csrf
@@ -57,6 +60,11 @@
                     required
                     class="sm:col-span-2"
                 />
+                @if ($canCreateSupplier)
+                    <p class="-mt-2 text-sm sm:col-span-2 lg:col-span-4">
+                        Not in the list? <button type="button" x-on:click="$dispatch('open-modal', 'quick-supplier')" class="font-medium text-brand-700 hover:underline">+ New supplier</button>
+                    </p>
+                @endif
                 <x-ui.date-input name="order_date" label="Order date" :value="$order->order_date" required />
                 <x-ui.date-input name="expected_date" label="Expected delivery" :value="$order->expected_date" />
                 <x-ui.textarea name="note" label="Note to supplier" :value="$order->note" rows="2" class="sm:col-span-2 lg:col-span-4" />
@@ -68,7 +76,12 @@
                 <x-ui.button variant="secondary" size="sm" x-on:click="suggest()" ::disabled="loading">Add products below reorder level</x-ui.button>
             </x-slot:actions>
 
-            <x-ui.product-picker class="max-w-xl" />
+            <div class="flex flex-wrap items-start gap-3">
+                <x-ui.product-picker class="w-full max-w-xl" :supplier="true" :supplier-id="old('supplier_id', $order->supplier_id)" :supplier-name="$supplierName" />
+                @if ($canCreateProduct)
+                    <x-ui.button variant="secondary" size="sm" class="sm:mt-6" x-on:click="$dispatch('open-modal', 'quick-product')">+ New product</x-ui.button>
+                @endif
+            </div>
             <p x-show="message" x-text="message" x-cloak class="mt-2 text-sm text-gray-600"></p>
 
             <div class="mt-4 overflow-x-auto" x-show="lines.length" x-cloak>
@@ -150,6 +163,120 @@
             </x-slot:footer>
         </x-ui.card>
     </form>
+
+    @if ($canCreateSupplier)
+        <x-ui.modal name="quick-supplier" title="New supplier">
+            <form x-data="quickSupplier({ url: @js(route('purchasing.suppliers.store')) })" x-on:submit.prevent="save()" class="space-y-3">
+                <div>
+                    <x-ui.label for="qs-name" :required="true">Name</x-ui.label>
+                    <input id="qs-name" x-model="form.name" required maxlength="150" class="mt-1 {{ $inputClass }}">
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <x-ui.label for="qs-contact">Contact person</x-ui.label>
+                        <input id="qs-contact" x-model="form.contact_person" maxlength="100" class="mt-1 {{ $inputClass }}">
+                    </div>
+                    <div>
+                        <x-ui.label for="qs-phone">Phone</x-ui.label>
+                        <input id="qs-phone" x-model="form.phone" maxlength="30" inputmode="tel" class="mt-1 {{ $inputClass }}">
+                    </div>
+                    <div>
+                        <x-ui.label for="qs-terms">Credit days</x-ui.label>
+                        <input id="qs-terms" type="number" min="0" max="365" x-model="form.payment_terms_days" class="mt-1 {{ $inputClass }}">
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500">Address, e-mail and opening balance can be added later on the supplier's page.</p>
+                <ul x-show="errors.length" x-cloak class="list-disc rounded-md bg-red-50 py-2 pl-8 pr-3 text-sm text-red-700">
+                    <template x-for="error in errors" :key="error"><li x-text="error"></li></template>
+                </ul>
+                <div class="flex justify-end gap-2 pt-2">
+                    <x-ui.button variant="secondary" x-on:click="$dispatch('close-modal', 'quick-supplier')">Cancel</x-ui.button>
+                    <x-ui.button type="submit" ::disabled="saving">Add supplier</x-ui.button>
+                </div>
+            </form>
+        </x-ui.modal>
+    @endif
+
+    @if ($canCreateProduct)
+        <x-ui.modal name="quick-product" title="New product" max-width="xl">
+            <form
+                x-data="quickProduct({ url: @js(route('purchasing.purchase-orders.quick-product')), supplierId: @js(old('supplier_id', $order->supplier_id)), supplierName: @js($supplierName), unitId: @js((string) (array_search('packet', $units, true) ?: array_key_first($units))) })"
+                x-on:submit.prevent="save()"
+                @picker-supplier.window="supplierId = $event.detail.id; supplierName = $event.detail.name"
+                class="space-y-3"
+            >
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <x-ui.label for="qp-name" :required="true">Name (with pack size)</x-ui.label>
+                        <input id="qp-name" x-model="form.name" required maxlength="150" placeholder="e.g. Pumpkin Arjuna 10g packet" class="mt-1 {{ $inputClass }}">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <x-ui.label for="qp-name-si">Sinhala name</x-ui.label>
+                        <input id="qp-name-si" x-model="form.name_si" maxlength="150" class="mt-1 font-sinhala {{ $inputClass }}">
+                    </div>
+                    <div>
+                        <x-ui.label for="qp-category" :required="true">Category</x-ui.label>
+                        <select id="qp-category" x-model="form.category_id" required class="mt-1 {{ $inputClass }}">
+                            <option value="">Choose…</option>
+                            @foreach ($categories as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <x-ui.label for="qp-unit" :required="true">Counted in</x-ui.label>
+                        <select id="qp-unit" x-model="form.base_unit_id" required class="mt-1 {{ $inputClass }}">
+                            @foreach ($units as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <x-ui.label for="qp-brand">Brand</x-ui.label>
+                        <div class="mt-1 flex gap-2">
+                            <select id="qp-brand" x-show="! newBrand" x-model="form.brand_id" class="{{ $inputClass }}">
+                                <option value="">No brand</option>
+                                @foreach ($brands as $id => $name)
+                                    <option value="{{ $id }}">{{ $name }}</option>
+                                @endforeach
+                            </select>
+                            <input x-show="newBrand" x-cloak x-ref="newBrand" x-model="form.new_brand" maxlength="100" placeholder="New brand name" aria-label="New brand name" class="{{ $inputClass }}">
+                            <x-ui.button variant="secondary" size="sm" class="shrink-0" x-on:click="toggleNewBrand()"><span x-text="newBrand ? 'Pick a brand' : '+ New brand'">+ New brand</span></x-ui.button>
+                        </div>
+                    </div>
+                    @if ($canCost)
+                        <div>
+                            <x-ui.label for="qp-cost">Cost (Rs.)</x-ui.label>
+                            <input id="qp-cost" x-model="form.reference_cost" inputmode="decimal" placeholder="0.00" class="mt-1 tabular {{ $inputClass }}">
+                        </div>
+                    @endif
+                    @if ($canSetPrice)
+                        <div>
+                            <x-ui.label for="qp-price">Selling price (Rs.)</x-ui.label>
+                            <input id="qp-price" x-model="form.retail_price" inputmode="decimal" placeholder="0.00" class="mt-1 tabular {{ $inputClass }}">
+                        </div>
+                    @endif
+                    <div>
+                        <x-ui.label for="qp-reorder">Reorder level</x-ui.label>
+                        <input id="qp-reorder" type="number" min="0" step="any" x-model="form.reorder_level" class="mt-1 tabular {{ $inputClass }}">
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500">
+                    The short code is given from the category's range.
+                    <span x-show="supplierId">The product is linked to <span class="font-medium" x-text="supplierName"></span> and added to this order.</span>
+                    <span x-show="! supplierId">Choose the supplier first to link the product to them.</span>
+                    More units, wholesale prices and other details: edit the product later.
+                </p>
+                <ul x-show="errors.length" x-cloak class="list-disc rounded-md bg-red-50 py-2 pl-8 pr-3 text-sm text-red-700">
+                    <template x-for="error in errors" :key="error"><li x-text="error"></li></template>
+                </ul>
+                <div class="flex justify-end gap-2 pt-2">
+                    <x-ui.button variant="secondary" x-on:click="$dispatch('close-modal', 'quick-product')">Cancel</x-ui.button>
+                    <x-ui.button type="submit" ::disabled="saving">Add product</x-ui.button>
+                </div>
+            </form>
+        </x-ui.modal>
+    @endif
 @endsection
 
 @push('scripts')
@@ -213,6 +340,12 @@
                     this.lines.splice(index, 1);
                 },
 
+                supplierChanged(result) {
+                    this.supplierId = result.id;
+                    this.supplierName = result.label;
+                    window.dispatchEvent(new CustomEvent('picker-supplier', { detail: { id: result.id, name: result.label } }));
+                },
+
                 async suggest() {
                     const supplierId = this.supplierId || document.querySelector('input[name=supplier_id]')?.value;
                     if (!supplierId) {
@@ -260,6 +393,90 @@
 
                 qtyText(qty) {
                     return Number(qty ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 3 });
+                },
+            };
+        }
+
+        async function postJson(url, body) {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                body: JSON.stringify(body),
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw data.errors ? Object.values(data.errors).flat() : [data.message || 'Could not save. Please try again.'];
+            }
+
+            return data;
+        }
+
+        function quickSupplier({ url }) {
+            const blank = () => ({ name: '', contact_person: '', phone: '', payment_terms_days: 30, is_active: true });
+
+            return {
+                form: blank(),
+                errors: [],
+                saving: false,
+
+                async save() {
+                    this.saving = true;
+                    this.errors = [];
+                    try {
+                        const supplier = await postJson(url, this.form);
+                        this.$dispatch('search-select-set', { name: 'supplier_id', result: supplier });
+                        this.$dispatch('close-modal', 'quick-supplier');
+                        this.form = blank();
+                    } catch (errors) {
+                        this.errors = errors;
+                    } finally {
+                        this.saving = false;
+                    }
+                },
+            };
+        }
+
+        function quickProduct({ url, supplierId, supplierName, unitId }) {
+            const blank = () => ({ name: '', name_si: '', category_id: '', base_unit_id: unitId, brand_id: '', new_brand: '', reference_cost: '', retail_price: '', reorder_level: '' });
+
+            return {
+                supplierId,
+                supplierName,
+                form: blank(),
+                newBrand: false,
+                errors: [],
+                saving: false,
+
+                toggleNewBrand() {
+                    this.newBrand = !this.newBrand;
+                    this.form.new_brand = '';
+                    this.$nextTick(() => this.newBrand && this.$refs.newBrand.focus());
+                },
+
+                async save() {
+                    this.saving = true;
+                    this.errors = [];
+                    try {
+                        const item = await postJson(url, {
+                            ...this.form,
+                            brand_id: this.newBrand ? null : (this.form.brand_id || null),
+                            new_brand: this.newBrand ? this.form.new_brand : null,
+                            supplier_id: this.supplierId || null,
+                        });
+                        this.$dispatch('product-created', item);
+                        this.$dispatch('close-modal', 'quick-product');
+                        this.form = blank();
+                        this.newBrand = false;
+                    } catch (errors) {
+                        this.errors = errors;
+                    } finally {
+                        this.saving = false;
+                    }
                 },
             };
         }

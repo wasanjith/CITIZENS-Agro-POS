@@ -3,11 +3,13 @@
  *
  *   <div x-data="searchSelect({ url: '/api/...', value: 1, label: 'Current' })"> ... </div>
  *
- * Used by <x-ui.search-select>.
+ * Used by <x-ui.search-select>. Another component can pick a value (e.g. a supplier just
+ * created in a modal) with: $dispatch('search-select-set', { name: 'supplier_id', result: { id, label } }).
  */
-export default function searchSelect({ url, value = null, label = '', minLength = 1 }) {
+export default function searchSelect({ url, name = null, value = null, label = '', minLength = 1 }) {
     return {
         url,
+        name,
         value,
         label,
         query: '',
@@ -56,6 +58,13 @@ export default function searchSelect({ url, value = null, label = '', minLength 
         clear() {
             this.value = null;
             this.label = '';
+            this.$dispatch('search-select-cleared', { name: this.name });
+        },
+
+        set(detail) {
+            if (detail?.name === this.name && detail.result) {
+                this.choose(detail.result);
+            }
         },
 
         move(step) {

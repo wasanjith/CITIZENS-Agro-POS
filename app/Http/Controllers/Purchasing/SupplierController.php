@@ -61,7 +61,10 @@ class SupplierController extends Controller
         return view('purchasing.suppliers.form', ['supplier' => new Supplier(['is_active' => true, 'payment_terms_days' => 30, 'opening_balance' => '0.00'])]);
     }
 
-    public function store(Request $request, FinancePosting $finance): RedirectResponse
+    /**
+     * Also called from the purchase order form ("New supplier"), which wants JSON back.
+     */
+    public function store(Request $request, FinancePosting $finance): RedirectResponse|JsonResponse
     {
         $this->authorize('create', Supplier::class);
 
@@ -71,6 +74,10 @@ class SupplierController extends Controller
 
             return $supplier;
         });
+
+        if ($request->expectsJson()) {
+            return response()->json(['id' => $supplier->id, 'label' => $supplier->name, 'hint' => $supplier->phone], 201);
+        }
 
         return redirect()->route('purchasing.suppliers.show', $supplier)->with('success', "Supplier {$supplier->name} created.");
     }

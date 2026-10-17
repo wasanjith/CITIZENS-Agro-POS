@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Purchasing;
 
+use App\Domain\Catalog\Models\Brand;
+use App\Domain\Catalog\Models\Product;
+use App\Domain\Catalog\Models\Unit;
 use App\Domain\Inventory\Services\StockService;
 use App\Domain\Purchasing\Actions\ApprovePurchaseOrderAction;
 use App\Domain\Purchasing\Actions\SavePurchaseOrderAction;
@@ -13,6 +16,7 @@ use App\Domain\Purchasing\Models\PurchaseOrderLine;
 use App\Domain\Purchasing\Models\Supplier;
 use App\Domain\Purchasing\Services\ReorderSuggestions;
 use App\Domain\System\Services\Settings;
+use App\Http\Controllers\Catalog\CategoryController;
 use App\Http\Controllers\Concerns\HasListQuery;
 use App\Http\Controllers\Concerns\PresentsProductLines;
 use App\Http\Controllers\Controller;
@@ -287,12 +291,20 @@ class PurchaseOrderController extends Controller
             ])->all();
 
         $supplierId = old('supplier_id') ?? $order->supplier_id;
+        $canCreateProduct = $request->user()->can('create', Product::class);
 
         return [
             'order' => $order,
             'canCost' => $canCost,
             'lines' => $this->presentLines($lines, $canCost),
             'supplierName' => $supplierId ? Supplier::withTrashed()->find($supplierId)?->name : '',
+            // "New supplier" / "New product" pop-ups, for goods that arrive with a new brand.
+            'canCreateSupplier' => $request->user()->can('create', Supplier::class),
+            'canCreateProduct' => $canCreateProduct,
+            'canSetPrice' => $request->user()->can('managePrices', Product::class),
+            'categories' => $canCreateProduct ? CategoryController::options() : [],
+            'brands' => $canCreateProduct ? Brand::query()->active()->orderBy('name')->pluck('name', 'id')->all() : [],
+            'units' => $canCreateProduct ? Unit::query()->orderBy('id')->pluck('name', 'id')->all() : [],
         ];
     }
 

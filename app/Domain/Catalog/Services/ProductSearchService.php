@@ -25,6 +25,10 @@ use Throwable;
  *   3. Otherwise Meilisearch; if it is down, MySQL FULLTEXT (ngram) + LIKE on short codes.
  *   4. Hits are hydrated from MySQL with live prices and live stock (on hand − reserved).
  *   5. Cost fields are only included for users with catalog.cost.view.
+ *   6. The brands of the hits come back as suggestions, so the same item from several
+ *      companies can be narrowed to one (brand_id filter). "lanka urea" also works.
+ *   7. supplier_id keeps only the products that supplier supplies (supplier_products, the
+ *      purchase order form). It searches MySQL, and with no term it lists them all.
  */
 class ProductSearchService
 {
@@ -40,39 +44,57 @@ class ProductSearchService
     ) {}
 
     /**
-     * @param  array{category_id?: int|null, brand_id?: int|null, include_inactive?: bool}  $filters
-     * @return array{term: string, qty: string|null, engine: string, items: list<array<string, mixed>>}
+     * @param  array{category_id?: int|null, brand_id?: int|null, supplier_id?: int|null, include_inactive?: bool}  $filters
+     * @return array{term: string, qty: string|null, engine: string, items: list<array<string, mixed>>, brands: list<array{id: int, name: string, count: int}>}
      */
     public function search(string $query, array $filters = [], int $limit = 20, ?User $user = null, ?int $priceListId = null): array
     {
         [$qty, $term] = self::parseQuantity($query);
 
+        $priceListId ??= PriceList::default()?->id;
+
         if ($term === '') {
-            return ['term' => '', 'qty' => $qty, 'engine' => self::ENGINE_CODE, 'items' => []];
+            if (empty($filters['supplier_id'])) {
+                return ['term' => '', 'qty' => $qty, 'engine' => self::ENGINE_CODE, 'items' => [], 'brands' => []];
+            }
+
+            $items = $this->hydrate($this->supplierProductIds($filters, $limit), $priceListId, $user);
+
+            return ['term' => '', 'qty' => $qty, 'engine' => self::ENGINE_MYSQL, 'items' => $items, 'brands' => self::brandsOf($items)];
         }
 
-        $priceListId ??= PriceList::default()?->id;
         $includeInactive = (bool) ($filters['include_inactive'] ?? false);
 
-        $exact = $this->exactCode($term, $includeInactive);
+        $exact = $this->exactCode($term, $includeInactive, isset($filters['supplier_id']) ? (int) $filters['supplier_id'] : null);
 
         if ($exact !== null) {
-            return [
-                'term' => $term,
-                'qty' => $qty,
-                'engine' => self::ENGINE_CODE,
-                'items' => $this->hydrate($exact[0], $priceListId, $user, onlyVariantId: $exact[1]),
-            ];
+            $items = $this->hydrate($exact[0], $priceListId, $user, onlyVariantId: $exact[1]);
+
+            return ['term' => $term, 'qty' => $qty, 'engine' => self::ENGINE_CODE, 'items' => $items, 'brands' => self::brandsOf($items)];
         }
 
         [$ids, $engine] = $this->findIds($term, $filters, $limit);
+        $items = array_slice($this->hydrate($ids, $priceListId, $user, $term), 0, $limit);
 
-        return [
-            'term' => $term,
-            'qty' => $qty,
-            'engine' => $engine,
-            'items' => array_slice($this->hydrate($ids, $priceListId, $user, $term), 0, $limit),
-        ];
+        return ['term' => $term, 'qty' => $qty, 'engine' => $engine, 'items' => $items, 'brands' => self::brandsOf($items)];
+    }
+
+    /**
+     * Brands among the result items, most items first: the chips that narrow
+     * "urea" down to one company's urea.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array{id: int, name: string, count: int}>
+     */
+    public static function brandsOf(array $items): array
+    {
+        return collect($items)
+            ->filter(fn (array $item) => $item['brand_id'] !== null)
+            ->groupBy('brand_id')
+            ->map(fn (Collection $group) => ['id' => (int) $group->first()['brand_id'], 'name' => (string) $group->first()['brand'], 'count' => $group->count()])
+            ->sortBy([['count', 'desc'], ['name', 'asc']])
+            ->values()
+            ->all();
     }
 
     /**
@@ -112,12 +134,13 @@ class ProductSearchService
     /**
      * @return array{0: list<int>, 1: int|null}|null product ids and the matched variant id
      */
-    private function exactCode(string $term, bool $includeInactive): ?array
+    private function exactCode(string $term, bool $includeInactive, ?int $supplierId = null): ?array
     {
         $code = mb_strtoupper($term);
 
         $product = Product::query()
             ->when(! $includeInactive, fn (Builder $query) => $query->active())
+            ->when($supplierId, fn (Builder $query) => self::suppliedBy($query, $supplierId))
             ->where('short_code', $code)
             ->first();
 
@@ -129,6 +152,7 @@ class ProductSearchService
             ->where('short_code', $code)
             ->when(! $includeInactive, fn (Builder $query) => $query->where('is_active', true)
                 ->whereHas('product', fn (Builder $product) => $product->active()))
+            ->when($supplierId, fn (Builder $query) => $query->whereHas('product', fn (Builder $product) => self::suppliedBy($product, $supplierId)))
             ->first();
 
         return $variant === null ? null : [[$variant->product_id], $variant->id];
@@ -140,7 +164,8 @@ class ProductSearchService
      */
     private function findIds(string $term, array $filters, int $limit): array
     {
-        if (config('scout.driver') === 'meilisearch') {
+        // The search index does not know who supplies what.
+        if (config('scout.driver') === 'meilisearch' && empty($filters['supplier_id'])) {
             try {
                 return [$this->meilisearch($term, $filters, $limit), self::ENGINE_MEILISEARCH];
             } catch (Throwable $exception) {
@@ -174,25 +199,44 @@ class ProductSearchService
 
     /**
      * Fallback: FULLTEXT with the ngram parser (handles Sinhala and partial words) plus
-     * LIKE on product and variant codes and names.
+     * LIKE on product and variant codes and names and the brand name. Products that have
+     * every word in their name, alias, code, variant name or brand come first, so "baur"
+     * and "lanka urea" are not outranked by ngram near-misses.
      *
      * @param  array<string, mixed>  $filters
      * @return list<int>
      */
     private function mysql(string $term, array $filters, int $limit): array
     {
-        $like = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term);
+        $like = self::escapeLike($term);
         $columns = ['name', 'name_si', 'aliases', 'short_code'];
         $useFullText = mb_strlen($term) >= 2;
+        $words = array_values(array_filter(preg_split('/\s+/u', $term) ?: []));
+        $everyWord = [];
 
-        $query = Product::query()
-            ->select('products.id')
-            ->when(! ($filters['include_inactive'] ?? false), fn (Builder $query) => $query->active())
-            ->when(! empty($filters['category_id']), function (Builder $query) use ($filters): void {
-                $category = Category::find($filters['category_id']);
-                $query->whereIn('category_id', $category?->descendantIdsAndSelf() ?? [0]);
-            })
-            ->when(! empty($filters['brand_id']), fn (Builder $query) => $query->where('brand_id', $filters['brand_id']))
+        if ($words !== []) {
+            $everyWord = $this->mysqlProducts($filters)
+                ->where(function (Builder $query) use ($words): void {
+                    foreach ($words as $word) {
+                        $wordLike = '%'.self::escapeLike($word).'%';
+                        $query->where(fn (Builder $query) => $query
+                            ->where('name', 'like', $wordLike)
+                            ->orWhere('name_si', 'like', $wordLike)
+                            ->orWhere('aliases', 'like', $wordLike)
+                            ->orWhere('short_code', 'like', $wordLike)
+                            ->orWhereHas('variants', fn (Builder $variants) => $variants->where('name', 'like', $wordLike))
+                            ->orWhereHas('brand', fn (Builder $brand) => $brand->where('name', 'like', $wordLike)));
+                    }
+                })
+                ->orderByDesc('sales_velocity_30d')
+                ->orderBy('name')
+                ->limit($limit)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        $query = $this->mysqlProducts($filters)
             ->where(function (Builder $query) use ($term, $like, $columns, $useFullText): void {
                 if ($useFullText) {
                     $query->whereFullText($columns, $term);
@@ -203,20 +247,72 @@ class ProductSearchService
                     ->orWhere('aliases', 'like', "%{$like}%")
                     ->orWhereHas('variants', fn (Builder $variants) => $variants
                         ->where('short_code', 'like', "{$like}%")
-                        ->orWhere('name', 'like', "%{$like}%"));
+                        ->orWhere('name', 'like', "%{$like}%"))
+                    ->orWhereHas('brand', fn (Builder $brand) => $brand->where('name', 'like', "%{$like}%"));
             });
 
         if ($useFullText) {
             $query->orderByRaw('MATCH (name, name_si, aliases, short_code) AGAINST (? IN NATURAL LANGUAGE MODE) DESC', [$term]);
         }
 
-        return $query
+        $ids = $query
             ->orderByDesc('sales_velocity_30d')
             ->orderBy('name')
             ->limit($limit)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
+
+        return array_slice(array_values(array_unique([...$everyWord, ...$ids])), 0, $limit);
+    }
+
+    /**
+     * Product ids query with the search filters (active, category, brand) applied.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Product>
+     */
+    private function mysqlProducts(array $filters): Builder
+    {
+        return Product::query()
+            ->select('products.id')
+            ->when(! ($filters['include_inactive'] ?? false), fn (Builder $query) => $query->active())
+            ->when(! empty($filters['category_id']), function (Builder $query) use ($filters): void {
+                $category = Category::find($filters['category_id']);
+                $query->whereIn('category_id', $category?->descendantIdsAndSelf() ?? [0]);
+            })
+            ->when(! empty($filters['brand_id']), fn (Builder $query) => $query->where('brand_id', $filters['brand_id']))
+            ->when(! empty($filters['supplier_id']), fn (Builder $query) => self::suppliedBy($query, (int) $filters['supplier_id']));
+    }
+
+    /**
+     * Every product the supplier supplies, A–Z (purchase order picker with nothing typed yet).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<int>
+     */
+    private function supplierProductIds(array $filters, int $limit): array
+    {
+        return $this->mysqlProducts($filters)
+            ->orderBy('name')
+            ->limit($limit)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    private static function suppliedBy(Builder $query, int $supplierId): Builder
+    {
+        return $query->whereIn('products.id', DB::table('supplier_products')->select('product_id')->where('supplier_id', $supplierId));
+    }
+
+    private static function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
     /**
@@ -358,6 +454,7 @@ class ProductSearchService
             'name' => $product->name,
             'variant_name' => null,
             'name_si' => $product->name_si,
+            'brand_id' => $product->brand_id,
             'brand' => $product->brand?->name,
             'category' => $product->category?->name,
             'is_active' => $product->is_active,

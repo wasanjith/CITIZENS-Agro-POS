@@ -36,7 +36,7 @@
         ]"
     />
 
-    <x-ui.filter-bar :action="route('inventory.stock.index')" :placeholder="$byBatch ? 'Code, name or lot no.' : 'Code, name or alias'" class="mb-4">
+    <x-ui.filter-bar :action="route('inventory.stock.index')" :placeholder="$byBatch ? 'Code, name or lot no.' : 'Code, name, alias or brand'" class="mb-4">
         @if ($byBatch)
             <input type="hidden" name="view" value="batches">
         @endif
@@ -53,6 +53,7 @@
         <x-ui.table>
             <x-slot:head>
                 <th>Product</th>
+                <th>Brand</th>
                 <th>Batch</th>
                 <th>Expiry</th>
                 <th class="text-right">On hand</th>
@@ -68,6 +69,7 @@
                         <a href="{{ route('catalog.products.show', $level->product_id) }}" class="font-mono text-xs font-semibold text-brand-700 hover:underline">{{ $level->variant?->short_code ?? $level->product->short_code }}</a>
                         <span class="font-medium">{{ $level->product->name }} {{ $level->variant?->name }}</span>
                     </td>
+                    <td class="text-gray-600">{{ $level->product->brand?->name ?? '—' }}</td>
                     <td class="text-gray-600">{{ $level->batch->isDefault() ? 'General stock' : ($level->batch->lot_no ? 'Lot '.$level->batch->lot_no : 'Received '.$level->batch->received_at->format('Y-m-d')) }}</td>
                     <td class="whitespace-nowrap @if ($level->batch->expiry_date?->isPast()) font-semibold text-red-700 @endif">{{ $level->batch->expiry_date?->format('Y-m-d') ?? '—' }}</td>
                     <td class="text-right tabular @if ((float) $level->qty_on_hand < 0) text-red-700 @endif">{{ Qty::format($level->qty_on_hand) }} {{ $level->product->baseUnit?->symbol }}</td>
@@ -85,6 +87,7 @@
             <x-slot:head>
                 <x-ui.th-sortable column="short_code" default="short_code">Code</x-ui.th-sortable>
                 <x-ui.th-sortable column="name" default="short_code">Name</x-ui.th-sortable>
+                <th>Brand</th>
                 <th>Category</th>
                 <x-ui.th-sortable column="on_hand" default="short_code" class="text-right">On hand</x-ui.th-sortable>
                 <th class="text-right">Reserved</th>
@@ -106,6 +109,7 @@
                             <p class="font-sinhala text-xs text-gray-600">{{ $product->name_si }}</p>
                         @endif
                     </td>
+                    <td class="text-gray-600">{{ $product->brand?->name ?? '—' }}</td>
                     <td class="text-gray-600">{{ $product->category?->name }}</td>
                     <td @class(['text-right tabular whitespace-nowrap', 'font-semibold text-amber-700' => $isLow, 'text-red-700' => $onHand < 0])>
                         {{ Qty::format((string) $product->on_hand) }} {{ $product->baseUnit?->symbol }}

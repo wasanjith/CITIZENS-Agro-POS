@@ -83,7 +83,7 @@ class StockController extends Controller
     private function productRows(Request $request, StockAlerts $alerts, bool $showCost): LengthAwarePaginator
     {
         $query = Product::query()
-            ->with(['category', 'baseUnit'])
+            ->with(['category', 'brand', 'baseUnit'])
             ->addSelect(['on_hand' => StockAlerts::onHandSubquery()])
             ->addSelect(['reserved' => DB::table('stock_levels')->selectRaw('COALESCE(SUM(qty_reserved), 0)')->whereColumn('stock_levels.product_id', 'products.id')])
             ->when($showCost, fn (Builder $query) => $query->addSelect(['stock_value' => DB::table('stock_levels')
@@ -94,7 +94,7 @@ class StockController extends Controller
         return $this->applyListQuery(
             $query,
             $request,
-            searchable: ['short_code', 'name', 'name_si', 'aliases'],
+            searchable: ['short_code', 'name', 'name_si', 'aliases', 'brand.name'],
             sortable: ['short_code', 'name', 'on_hand'],
             filters: [
                 'category' => function (Builder $query, string $categoryId): void {
@@ -139,7 +139,7 @@ class StockController extends Controller
                 ->orWhere('products.name', 'like', "%{$search}%")
                 ->orWhere('batches.lot_no', 'like', "%{$search}%")))
             ->when($categoryId, fn (Builder $query) => $query->whereIn('products.category_id', Category::find($categoryId)?->descendantIdsAndSelf() ?? [0]))
-            ->with(['batch', 'product.baseUnit', 'variant'])
+            ->with(['batch', 'product.baseUnit', 'product.brand', 'variant'])
             ->orderBy('products.short_code')
             ->orderByRaw('batches.expiry_date IS NULL, batches.expiry_date')
             ->select('stock_levels.*')

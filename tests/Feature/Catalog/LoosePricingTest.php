@@ -339,19 +339,16 @@ test('products without a selling price are listed in the report and on the produ
         ->assertDontSee($priced->name);
 });
 
-test('the demo catalog follows the shop pricing', function () {
+test('the demo catalog holds the owner seed list, one product per packet size', function () {
     $this->seed(DevelopmentCatalogSeeder::class);
 
-    $bag = Product::firstWhere('short_code', '1001');
-    $loose = Product::firstWhere('short_code', '1101');
+    $packet = Product::firstWhere('short_code', '2012');
 
-    expect($bag->name)->toBe('Urea 50kg bag')
-        ->and($bag->opens_into_product_id)->toBe($loose->id)
-        ->and($bag->opens_into_qty)->toBe('50.000')
-        ->and($loose->sold_loose)->toBeTrue()
-        ->and(priceOneLine($loose, 'kg', '0.5')['unit_price'])->toBe('300.00')
-        ->and(priceOneLine($loose, 'kg', '2')['unit_price'])->toBe('250.00')
-        ->and(priceOneLine($loose, 'kg', '2', $this->wholesale)['unit_price'])->toBe('240.00')
-        ->and(priceOneLine(Product::firstWhere('short_code', '2012'), 'packet', '1')['unit_price'])->toBe('290.00')
-        ->and(app(PriceBook::class)->whereWithoutPrice(Product::query(), $this->retail->id)->pluck('short_code')->all())->toBe(['2014']);
+    expect(Product::where('category_id', $packet->category_id)->count())->toBe(51)
+        ->and($packet->name)->toBe('Okra Haritha 50g packet')
+        ->and($packet->name_si)->toBe('බණ්ඩක්කා(හරිත) 50g')
+        ->and(priceOneLine($packet, 'packet', '1')['unit_price'])->toBe('290.00')
+        ->and(priceOneLine(Product::firstWhere('name', 'Chili MI-2 250g packet'), 'packet', '1')['unit_price'])->toBe('3000.00')
+        ->and(app(PriceBook::class)->whereWithoutPrice(Product::query(), $this->retail->id)->pluck('short_code')->all())
+        ->toBe(['2014', '2024', '2033', '2034', '2043', '2044', '2053', '2064', '2113', '2123', '2171']);
 });

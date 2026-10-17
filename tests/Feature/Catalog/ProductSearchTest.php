@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Services\ProductSearchService;
 use App\Domain\Identity\Enums\Role;
@@ -115,6 +116,36 @@ test('search falls back to MySQL when Meilisearch is unreachable', function () {
         ->assertOk()
         ->assertJsonPath('engine', ProductSearchService::ENGINE_MYSQL)
         ->assertJsonPath('items.0.short_code', '1001');
+});
+
+test('the same item from several brands can be found by brand and narrowed to one', function () {
+    $lanka = Brand::create(['name' => 'Lanka Fertilizer']);
+    $baur = Brand::create(['name' => 'Baur']);
+    $this->urea->update(['brand_id' => $lanka->id]);
+    $baurUrea = createProduct(['short_code' => '1005', 'name' => 'Urea 50kg', 'brand_id' => $baur->id, 'category' => 'Fertilizers']);
+    createProduct(['short_code' => '1006', 'name' => 'Baur Mix 1kg', 'category' => 'Fertilizers']);
+
+    $all = $this->actingAs($this->staff)->getJson(route('api.pos.search', ['q' => 'urea']))->assertOk();
+    expect(collect($all->json('brands'))->pluck('name')->all())->toEqualCanonicalizing(['Lanka Fertilizer', 'Baur'])
+        ->and(collect($all->json('items'))->firstWhere('id', $baurUrea->id)['brand'])->toBe('Baur');
+
+    $this->getJson(route('api.pos.search', ['q' => 'urea', 'brand_id' => $baur->id]))
+        ->assertJsonCount(1, 'items')
+        ->assertJsonPath('items.0.short_code', '1005');
+
+    // The brand name alone, and brand + product name in one search.
+    expect(collect($this->getJson(route('api.pos.search', ['q' => 'lanka']))->json('items'))->pluck('short_code')->all())->toBe(['1001'])
+        ->and(collect($this->getJson(route('api.pos.search', ['q' => 'baur urea']))->json('items'))->pluck('short_code')->all())->toBe(['1005']);
+});
+
+test('the product list searches the brand name', function () {
+    $this->urea->update(['brand_id' => Brand::create(['name' => 'Lanka Fertilizer'])->id]);
+
+    $this->actingAs(userWithRole(Role::Manager))
+        ->get(route('catalog.products.index', ['search' => 'lanka']))
+        ->assertOk()
+        ->assertSee($this->urea->name)
+        ->assertDontSee('Urea sprayer nozzle');
 });
 
 test('the search endpoint needs a signed-in user and is throttled', function () {

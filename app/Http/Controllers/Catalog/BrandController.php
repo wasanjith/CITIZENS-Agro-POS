@@ -59,6 +59,13 @@ class BrandController extends Controller
 
         $brand->update($this->validated($request, $brand));
 
+        // The brand name is in each product's search document.
+        if ($brand->wasChanged('name')) {
+            foreach ($brand->products()->get() as $product) {
+                $product->searchable();
+            }
+        }
+
         return redirect()->route('catalog.brands.index')->with('success', "Brand {$brand->name} updated.");
     }
 

@@ -64,6 +64,7 @@ use App\Http\Controllers\Pos\QuotationController as PosQuotationController;
 use App\Http\Controllers\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Purchasing\GoodsReceiptInvoiceController;
 use App\Http\Controllers\Purchasing\PurchaseOrderController;
+use App\Http\Controllers\Purchasing\QuickProductController;
 use App\Http\Controllers\Purchasing\SupplierController;
 use App\Http\Controllers\Purchasing\SupplierDocumentController;
 use App\Http\Controllers\Purchasing\SupplierPaymentController;
@@ -251,6 +252,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('suppliers', SupplierController::class);
 
         Route::get('purchase-orders/reorder-suggestions', [PurchaseOrderController::class, 'suggestions'])->name('purchase-orders.suggestions');
+        Route::post('purchase-orders/quick-product', QuickProductController::class)->name('purchase-orders.quick-product');
         Route::resource('purchase-orders', PurchaseOrderController::class)->except(['destroy']);
         Route::post('purchase-orders/{purchase_order}/submit', [PurchaseOrderController::class, 'submit'])->name('purchase-orders.submit');
         Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-orders.approve');

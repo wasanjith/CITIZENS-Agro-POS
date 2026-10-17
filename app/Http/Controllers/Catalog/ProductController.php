@@ -38,7 +38,7 @@ class ProductController extends Controller
         $products = $this->applyListQuery(
             Product::query()->with(['category', 'brand', 'baseUnit', 'units.unit'])->addSelect(['on_hand' => StockAlerts::onHandSubquery()]),
             $request,
-            searchable: ['short_code', 'name', 'name_si', 'aliases', 'sku'],
+            searchable: ['short_code', 'name', 'name_si', 'aliases', 'sku', 'brand.name'],
             sortable: ['short_code', 'name', 'created_at', 'updated_at'],
             filters: self::listFilters(),
             defaultSort: 'short_code',

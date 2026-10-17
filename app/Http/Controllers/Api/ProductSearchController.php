@@ -9,8 +9,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * GET /api/pos/search?q=5*urea&category_id=&brand_id=&price_list_id=&limit=
- * Used by the POS search box and the back-office top bar.
+ * GET /api/pos/search?q=5*urea&category_id=&brand_id=&supplier_id=&price_list_id=&limit=
+ * Used by the POS search box, the back-office top bar and the document line editors
+ * (supplier_id: the purchase order form, only that supplier's products).
  */
 class ProductSearchController extends Controller
 {
@@ -22,13 +23,14 @@ class ProductSearchController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'category_id' => ['nullable', 'integer'],
             'brand_id' => ['nullable', 'integer'],
+            'supplier_id' => ['nullable', 'integer'],
             'price_list_id' => ['nullable', 'integer', 'exists:price_lists,id'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
         $result = $search->search(
             (string) ($validated['q'] ?? ''),
-            ['category_id' => $validated['category_id'] ?? null, 'brand_id' => $validated['brand_id'] ?? null],
+            ['category_id' => $validated['category_id'] ?? null, 'brand_id' => $validated['brand_id'] ?? null, 'supplier_id' => $validated['supplier_id'] ?? null],
             (int) ($validated['limit'] ?? 20),
             $request->user(),
             isset($validated['price_list_id']) ? (int) $validated['price_list_id'] : null,

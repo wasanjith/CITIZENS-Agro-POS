@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\OpeningStockEntry;
 use App\Domain\Identity\Enums\Role;
 use App\Domain\Inventory\Actions\PostOpeningStockAction;
@@ -56,6 +57,19 @@ test('stock pages render for the owner', function () {
     $this->get(route('inventory.movements.index', ['product' => $this->urea->id]))->assertOk()->assertSee('Goods received');
     $this->get(route('catalog.products.show', $this->urea))->assertOk()->assertSee('Stock by batch');
     $this->get(route('catalog.products.index', ['filter' => ['low' => '1']]))->assertOk()->assertSee('Urea 50kg');
+});
+
+test('the stock list shows each product brand and finds products by brand', function () {
+    $this->urea->update(['brand_id' => Brand::create(['name' => 'Lanka Fertilizer'])->id]);
+    $other = createProduct(['name' => 'Okra 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet']);
+    $this->stock->receive($this->urea, null, '50', '170');
+    $this->stock->receive($other, null, '5', '70');
+
+    $this->actingAs($this->owner);
+
+    $this->get(route('inventory.stock.index'))->assertOk()->assertSeeInOrder(['Brand', 'Category'])->assertSee('Lanka Fertilizer');
+    $this->get(route('inventory.stock.index', ['view' => 'batches']))->assertOk()->assertSee('Lanka Fertilizer');
+    $this->get(route('inventory.stock.index', ['search' => 'lanka']))->assertOk()->assertSee('Urea 50kg')->assertDontSee('Okra 10g packet');
 });
 
 test('sales staff see stock but never its value or cost', function () {

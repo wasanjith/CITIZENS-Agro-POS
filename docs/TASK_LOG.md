@@ -11,7 +11,7 @@
 |---|---|
 | **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
 | **Last updated** | 2026-10-16 |
-| **Tests** | 492 Pest tests at the last full run (2026-10-09) + 20 new. 2026-10-16: the 43 Purchasing tests (9 new) pass; the full suite was not re-run. |
+| **Tests** | 492 Pest tests at the last full run (2026-10-09) + 20 new. 2026-10-16: Inventory + Purchasing + Catalog (183, 8 new) and Search (16) pass when run separately; the full suite was not re-run. |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
 | **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
@@ -101,6 +101,39 @@
 ## Log
 
 Newest first.
+
+### 2026-10-16: Full hardware shopping list for hosting
+- **DEPLOYMENT.md § 3** rewritten as a full bill of materials with the capacity to ask for: at-a-glance table + what sits where, computers (server summary, counter business mini PCs), monitors/keyboards, 80 mm printers (speed, cutter, head life, Windows + Linux driver) and paper use (~1 × 80 m roll a day), network (8-port gigabit easy-smart switch, **Cat6 23 AWG solid copper, no CCA**, patch panel, wall jacks, factory patch cords, 6U wall cabinet, router/Wi-Fi), power (UPS A 1500 VA/900 W **pure sine wave** with load table ≈ 110 W normal / 255 W peak, UPS B 650–850 VA per counter, earth check, Type 2 surge protector, dedicated 13 A circuit), furniture, spares/tools, not needed.
+- § 4.1.1 (UPS, patch cable), § 6.1 (counter PC) and § 9 (UPS table) brought in line. Docs only, no code changed.
+
+### 2026-10-16: Supplier's own products on purchase orders, new supplier / product / brand from the PO window
+- **Supplier seed:** new `DevelopmentSupplierSeeder` (local only, runs after the catalog seeder): Bathalagoda Agro, CIC (both with the details and opening balances the owner had typed in) and Ishara Lak Seeds. Each is linked (`supplier_products`) to the products of its brand: Bathalagoda Agro 43, Ishara Lak Seeds 7, CIC 0 (no CIC products in the catalog yet).
+- **Dev database:** only the supplier tables were reset (`suppliers`, `supplier_products` and their two opening-balance journal entries, no POs/GRNs existed), then the seeder ran again. The opening balances were posted again as JE-2026-000008/9.
+- **PO product search:** once a supplier is chosen, "Add product" finds only that supplier's products, and clicking the empty box lists all of them A–Z. The "Only <supplier>'s products" tickbox (on by default) can be unticked to search everything. Search API: `supplier_id` filter (MySQL, since the search index doesn't know suppliers). Direct deliveries (GRN without a PO) are **not** filtered. Products get linked to a supplier by PO approval, by GRN posting (also direct deliveries) and by the new "New product" pop-up.
+- **New supplier / new product in the PO window** (Owner and Manager only; staff don't see the buttons): "+ New supplier" (name, contact, phone, credit days) picks the new supplier on the order. "+ New product" (name, Sinhala name, category, unit, brand **or a new brand**, cost, selling price, reorder level) gives the next short code in the category's range, links the product to the chosen supplier and adds it as a line. Route `purchasing.purchase-orders.quick-product` (`QuickProductController`). `SupplierController@store` returns JSON when asked.
+- Files: `ProductSearchService`, `ProductSearchController`, `PurchaseOrderController`, `QuickProductController`, `SupplierController`, `purchase-orders/form.blade.php`, `components/ui/product-picker.blade.php` + `alpine/product-picker.js`, `alpine/search-select.js` + component (can be set from outside), `routes/web.php`, `DatabaseSeeder`.
+- Tests: new `Purchasing/PurchaseOrderSupplierProductsTest` (8). Inventory + Purchasing + Catalog: 183 pass; Search: 16 pass. Note: running `tests/Search` in the **same** run before other folders leaks its committed rows into them (existing issue: the Search tests truncate before, not after). PHPStan on the changed files: 0 errors; Pint clean; `npm run build` done.
+
+### 2026-10-16: Brand column on Stock on hand
+- Inventory → Stock on hand: new **Brand** column on the "By product" and "Low stock" tabs (before Category) and on the "By batch" tab (after Product); "—" when a product has no brand. The search box there also matches the brand name ("Code, name, alias or brand").
+- Files: `StockController` (eager-loads `brand`, `brand.name` searchable), `inventory/stock/index.blade.php`.
+- Test: new brand column + brand search test in `InventoryPagesTest` (8 pass).
+
+### 2026-10-16: Demo catalog = the owner's real seed list
+- `DevelopmentCatalogSeeder` now seeds exactly the 51 products in `docs/CITIZENS- Inventory.xlsx` (all Seeds); the old demo fertilizers, chemicals, tools and bicycle parts are gone. Each packet size is its own product ("Okra Haritha 10g packet", unit packet), with the sheet's cost, retail price and reorder level. Blank cost or price → none yet (11 packets show in the no-price filter). The sheet has no wholesale prices and no opening stock.
+- Short codes: one block of ten per family (Okra Haritha 2011–2014, Okra MI5 2021–2024 … Marrow 2171).
+- Names that appear twice in the sheet got a qualifier: "Okra Haritha" / "Okra MI5", "Radish" (Bathalagoda) / "Radish Ishara Lak". Sinhala names copied from the sheet, except two fixes: a stray Tibetan character in "හවරි පොළොන් මෑ" (guessed "න්") and a hidden joiner before the Ishara Lak Radish name. Romanised search aliases added (bandakka, miris, karawila …), since the sheet's Aliases column is empty.
+- Marrow (Land Mark Seeds) has no pack size or price in the sheet; seeded as "Marrow" with no price.
+- Test: the demo-catalog test in `LoosePricingTest` rewritten for the new data; that file passes (26). Full suite not re-run.
+- To load: `php artisan migrate:fresh --seed` (wipes the dev database), then `php artisan scout:sync-index-settings` and `php artisan queue:work --stop-when-empty`.
+
+### 2026-10-16: Product search by brand (company) name, with brand suggestions
+- Search (POS, top bar, line-editor picker) now finds products by brand: "baur" or "baur urea". Meilisearch already indexed the brand; the MySQL fallback now matches brand names too, and products with every typed word in their name / alias / code / variant / brand rank above ngram near-misses.
+- The search API returns `brands` (the brands among the hits, with counts) and each item has `brand_id`. The POS shows brand chips under the search box ("All", "Lanka Fertilizer 2", "Baur 1"); a chip narrows the results to that brand (`brand_id` filter) and they reset when the term changes or an item is added.
+- Each result row in the POS, top-bar search and product picker shows the brand name next to the product name.
+- Products list (Catalog → Products) search also matches the brand name (`HasListQuery` accepts `relation.column`).
+- Renaming a brand reindexes its products in Meilisearch.
+- Tests: brand search, brand chips, brand filter, brand + name (Feature/Catalog/ProductSearchTest, Search/MysqlFallbackSearchTest), products list by brand.
 
 ### 2026-10-16: Purchasing → Invoices: a folder for each supplier
 - Owner: a new *Invoices* item under Purchasing that shows every supplier as a file (folder squares, searchable); open one to add the supplier's invoices, bank deposit slips and all other receipts.

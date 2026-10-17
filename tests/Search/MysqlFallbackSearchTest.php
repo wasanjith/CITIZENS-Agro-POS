@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Services\ProductSearchService;
 
 /*
@@ -28,3 +29,12 @@ test('the fallback finds products by name, Sinhala name, alias and typo', functi
     'alias' => ['yuriya', '1001'],
     'short alias' => ['tsp', '1002'],
 ]);
+
+test('the fallback finds a product by brand, and brand + name puts that brand first', function () {
+    $baur = Brand::create(['name' => 'Baur']);
+    createProduct(['short_code' => '1005', 'name' => 'Urea 50kg', 'brand_id' => $baur->id, 'category' => 'Fertilizers']);
+
+    expect($this->search->search('baur')['items'][0]['short_code'] ?? null)->toBe('1005')
+        ->and($this->search->search('baur urea')['items'][0]['short_code'] ?? null)->toBe('1005')
+        ->and($this->search->search('baur urea')['brands'][0]['name'] ?? null)->toBe('Baur');
+});

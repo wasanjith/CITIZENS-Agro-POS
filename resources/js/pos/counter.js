@@ -22,6 +22,10 @@ export default function posCounter(config) {
         searching: false,
         searchController: null,
         categoryId: null,
+        // Brand chips for the current search term; brandId narrows the results to one.
+        brands: [],
+        brandsFor: null,
+        brandId: null,
 
         // Cart
         cart: null,
@@ -194,11 +198,18 @@ export default function posCounter(config) {
                 this.searchController?.abort();
                 this.results = [];
                 this.resultsFor = null;
+                this.brands = [];
+                this.brandsFor = null;
+                this.brandId = null;
                 return Promise.resolve();
             }
 
+            // A new term starts again with all brands.
+            if (this.brandsFor !== term) this.brandId = null;
+            const brandId = this.brandId;
+
             // The same query is already on its way (Enter right after typing): wait for it.
-            if (this.pendingSearch?.term === term) {
+            if (this.pendingSearch?.term === term && this.pendingSearch?.brandId === brandId) {
                 return this.pendingSearch.promise;
             }
 
@@ -211,11 +222,17 @@ export default function posCounter(config) {
                 try {
                     const params = new URLSearchParams({ q: term, limit: 20 });
                     if (this.cart.price_list_id) params.set('price_list_id', this.cart.price_list_id);
+                    if (brandId !== null) params.set('brand_id', brandId);
                     const data = await api(`${this.config.urls.search}?${params}`, { signal: controller.signal });
                     // A slow answer for an older query must not replace newer results (or come back after the item was added).
-                    if (this.query.trim() !== term) return;
+                    if (this.query.trim() !== term || this.brandId !== brandId) return;
                     this.results = (data.items ?? []).map((item) => ({ ...item, qty: data.qty }));
                     this.resultsFor = term;
+                    // Keep the full brand list while one brand is chosen, so the cashier can switch.
+                    if (brandId === null) {
+                        this.brands = data.brands ?? [];
+                        this.brandsFor = term;
+                    }
                     this.highlighted = 0;
                 } catch (error) {
                     if (error.name !== 'AbortError') this.results = [];
@@ -227,9 +244,15 @@ export default function posCounter(config) {
                 }
             })();
 
-            this.pendingSearch = { term, promise };
+            this.pendingSearch = { term, brandId, promise };
 
             return promise;
+        },
+
+        filterBrand(brandId) {
+            this.brandId = brandId;
+            this.search();
+            this.focusSearch();
         },
 
         async showTab(tab, categoryId = null) {
@@ -329,6 +352,9 @@ export default function posCounter(config) {
             this.query = '';
             this.resultsFor = null;
             this.results = this.tab === 'search' ? [] : this.results;
+            this.brands = [];
+            this.brandsFor = null;
+            this.brandId = null;
             this.changed();
             this.focusSearch();
         },

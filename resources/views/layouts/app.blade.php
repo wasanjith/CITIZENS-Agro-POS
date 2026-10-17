@@ -81,6 +81,7 @@
                                 <span class="min-w-0">
                                     <span class="font-mono text-xs font-semibold text-brand-700" x-text="item.short_code"></span>
                                     <span class="font-medium text-gray-900" x-text="item.name"></span>
+                                    <span x-show="item.brand" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700" x-text="item.brand"></span>
                                     <span class="block truncate font-sinhala text-xs text-gray-500" x-text="item.name_si"></span>
                                 </span>
                                 <span class="whitespace-nowrap text-xs tabular text-gray-600" x-text="price(item)"></span>
