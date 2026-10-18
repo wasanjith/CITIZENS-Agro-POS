@@ -166,10 +166,10 @@ The form has five tabs. A red dot on a tab means an error on it.
 
 | Field | Meaning |
 |---|---|
-| Short code * | What staff type at the counter (e.g. `1023`). Press **Suggest** for the next free code in the category. A deleted product's code is never reused. |
-| SKU / supplier code | Optional. |
-| Name (English) * | |
-| Category *, Brand | |
+| Name (English) * | Type this first. |
+| Category *, Brand | Choosing them fills the short code and SKU automatically. |
+| Short code * | What staff type at the counter (e.g. `1023`). Filled with the next free code in the category; press **Suggest** to refill. A deleted product's code is never reused. |
+| SKU / supplier code | Optional. Filled from category + brand + number, e.g. `FER-BAT-001`; type over it with the supplier's own code if you prefer. |
 | **Base unit** * | The unit stock is counted in. **All stock is stored in this unit.** Sealed goods: packet, bag, bottle, piece. Loose goods: kg. |
 | Tax | Leave empty unless VAT applies. |
 | **Sold loose (weighed out)** | Tick for fertilizer weighed at the counter. It gets two prices (section 6.5). Leave it off for sealed packets and bags. |

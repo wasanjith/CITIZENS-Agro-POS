@@ -6,6 +6,7 @@ use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductPrice;
 use App\Domain\Catalog\Models\ProductUnit;
 use App\Domain\Catalog\Models\ProductVariant;
+use App\Domain\Catalog\Services\BrandSupplierLinker;
 use App\Domain\Catalog\Services\PriceBook;
 use App\Domain\Inventory\Support\Qty;
 use App\Models\User;
@@ -35,7 +36,7 @@ class SaveProductAction
         'track_batches', 'track_expiry', 'reorder_level', 'reorder_qty', 'attributes', 'is_active',
     ];
 
-    public function __construct(private readonly PriceBook $priceBook) {}
+    public function __construct(private readonly PriceBook $priceBook, private readonly BrandSupplierLinker $brandSuppliers) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -45,6 +46,8 @@ class SaveProductAction
         $product ??= new Product(['created_by' => $actor->id]);
 
         return DB::transaction(function () use ($data, $actor, $product, $index): Product {
+            $isNew = ! $product->exists;
+            $previousBrandId = $product->brand_id;
             $product->fill(Arr::only($data, self::PRODUCT_FIELDS));
 
             if ($actor->can('viewCost', Product::class)) {
@@ -56,6 +59,10 @@ class SaveProductAction
             }
 
             $product->save();
+
+            if ($isNew || $product->wasChanged('brand_id')) {
+                $this->brandSuppliers->linkProduct($product, $isNew ? null : $previousBrandId);
+            }
 
             if (array_key_exists('units', $data)) {
                 $this->syncUnits($product, $data['units']);

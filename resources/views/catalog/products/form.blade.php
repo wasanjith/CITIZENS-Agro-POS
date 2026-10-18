@@ -44,7 +44,10 @@
             tab: @js($firstTab),
             isNew: @js($isNew),
             code: @js(old('short_code', $product->short_code)),
+            sku: @js(old('sku', $product->sku)),
             categoryId: @js((string) old('category_id', $product->category_id)),
+            brandId: @js((string) old('brand_id', $product->brand_id)),
+            opensInto: @js((string) old('opens_into_product_id', $product->opens_into_product_id)),
             baseUnitId: @js((string) old('base_unit_id', $product->base_unit_id)),
             soldLoose: @js((bool) old('sold_loose', $product->sold_loose)),
             units: @js($units->map(fn ($unit) => ['id' => $unit->id, 'name' => $unit->name, 'symbol' => $unit->symbol])->values()),
@@ -82,20 +85,11 @@
         {{-- General --}}
         <div x-show="tab === 'general'">
             <x-ui.card>
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div>
-                        <x-ui.label for="short_code" :required="true">Short code</x-ui.label>
-                        <div class="mt-1 flex gap-2">
-                            <input type="text" name="short_code" id="short_code" x-model="code" required maxlength="20" class="{{ $inputClass }} font-mono uppercase" autocomplete="off">
-                            <x-ui.button variant="secondary" x-on:click="suggestCode(true)" x-bind:disabled="!categoryId" title="Next free code in the category range">Suggest</x-ui.button>
-                        </div>
-                        <p class="mt-1 text-xs text-gray-500" x-text="rangeHint || 'The code staff type at the counter, e.g. 1023.'"></p>
-                        <x-ui.field-error name="short_code" />
-                    </div>
-                    <x-ui.input name="sku" label="SKU / supplier code" :value="$product->sku" hint="Optional." />
-                    <x-ui.input name="name" label="Name (English)" :value="$product->name" required class="sm:col-span-2" />
-                    <x-ui.select name="category_id" label="Category" :options="$categories" placeholder="Choose…" required x-model="categoryId" x-on:change="suggestCode(false)" />
-                    <x-ui.select name="brand_id" label="Brand" :options="$brands" :value="$product->brand_id" placeholder="No brand" />
+                <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <x-ui.input name="name" label="Name (English)" :value="$product->name" required maxlength="150" :autofocus="$isNew" class="sm:col-span-2 lg:col-span-3" />
+
+                    <x-ui.select name="category_id" label="Category" :options="$categories" placeholder="Choose…" required x-model="categoryId" x-on:change="suggestCodes(false)" />
+                    <x-ui.select name="brand_id" label="Brand" :options="$brands" placeholder="No brand" x-model="brandId" x-on:change="suggestCodes(false)" />
                     <x-ui.select
                         name="base_unit_id"
                         label="Base unit"
@@ -103,21 +97,43 @@
                         placeholder="Choose…"
                         required
                         x-model="baseUnitId"
-                        hint="Stock is counted in this unit. Other units are set on the Units & Prices tab."
+                        hint="Stock is counted in this unit."
                     />
+
+                    <div>
+                        <x-ui.label for="short_code" :required="true">Short code</x-ui.label>
+                        <div class="mt-1 flex gap-2">
+                            <input type="text" name="short_code" id="short_code" x-model="code" required maxlength="20" class="{{ $inputClass }} font-mono uppercase" autocomplete="off">
+                            <x-ui.button variant="secondary" x-on:click="suggestCodes(true)" x-bind:disabled="!categoryId" title="Next free short code and SKU for the category and brand">Suggest</x-ui.button>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500" x-text="rangeHint || 'Typed at the counter. Filled in when you choose the category.'"></p>
+                        <x-ui.field-error name="short_code" />
+                    </div>
+                    <div>
+                        <x-ui.label for="sku">SKU / supplier code</x-ui.label>
+                        <input type="text" name="sku" id="sku" x-model="sku" maxlength="50" class="{{ $inputClass }} mt-1 font-mono" autocomplete="off">
+                        <p class="mt-1 text-xs text-gray-500">Optional. Suggested from category + brand, e.g. FER-BAT-001.</p>
+                        <x-ui.field-error name="sku" />
+                    </div>
                     <x-ui.select name="tax_id" label="Tax" :options="$taxes" :value="$product->tax_id" placeholder="No tax" />
-                    <x-ui.checkbox name="sold_loose" x-model="soldLoose" label="Sold loose (weighed out)" hint="Fertilizer weighed at the counter. It can have a price for small amounts and a cheaper price from 1 kg. Sealed packets and bags are separate products: leave this off for them." :checked="$product->sold_loose" class="sm:col-span-2" />
-                    <x-ui.select
-                        name="opens_into_product_id"
-                        label="Can be opened into"
-                        :options="$looseProducts"
-                        :value="$product->opens_into_product_id"
-                        placeholder="Not opened (sealed only)"
-                        hint="For a sealed bag that is sometimes opened and sold loose, e.g. Urea 50kg bag → Urea (loose)."
-                    />
-                    <x-ui.qty-input name="opens_into_qty" label="Loose quantity in one pack" :value="$product->opens_into_qty" hint="Base units of the loose product, e.g. 50 (kg) for a 50 kg bag." />
-                    <x-ui.textarea name="description" label="Description" :value="$product->description" class="sm:col-span-2" />
-                    <x-ui.checkbox name="is_active" label="Active" hint="Inactive products are hidden from the POS search." :checked="$product->is_active" class="sm:col-span-2" />
+
+                    <x-ui.checkbox name="sold_loose" x-model="soldLoose" label="Sold loose (weighed out)" hint="Weighed at the counter, e.g. fertilizer by kg. Leave off for sealed packets and bags." :checked="$product->sold_loose" class="sm:pt-6" />
+                    <div x-show="!soldLoose || opensInto">
+                        <x-ui.select
+                            name="opens_into_product_id"
+                            label="Can be opened into"
+                            :options="$looseProducts"
+                            placeholder="Not opened (sealed only)"
+                            x-model="opensInto"
+                            hint="e.g. Urea 50kg bag → Urea (loose)."
+                        />
+                    </div>
+                    <div x-show="opensInto" x-cloak>
+                        <x-ui.qty-input name="opens_into_qty" label="Loose quantity in one pack" :value="$product->opens_into_qty" hint="Base units of the loose product, e.g. 50 (kg)." />
+                    </div>
+
+                    <x-ui.textarea name="description" label="Description" :value="$product->description" rows="2" class="sm:col-span-2" />
+                    <x-ui.checkbox name="is_active" label="Active" hint="Inactive products are hidden from the POS search." :checked="$product->is_active" class="sm:pt-6" />
                 </div>
             </x-ui.card>
         </div>
@@ -374,6 +390,7 @@
                 ...config,
                 rangeHint: '',
                 autoCode: config.isNew ? config.code : null,
+                autoSku: config.isNew ? config.sku : null,
                 extraUnits: rows.filter((row) => row.unit_id !== base).map((row) => ({ key: key(), unit_id: row.unit_id, factor: row.factor })),
                 defaultSale: String(rows.find((row) => bool(row.is_default_sale))?.unit_id ?? base),
                 defaultPurchase: String(rows.find((row) => bool(row.is_default_purchase))?.unit_id ?? base),
@@ -471,16 +488,24 @@
                     return 'Cost ' + cost.toFixed(2) + ' · margin ' + ((price - cost) / cost * 100).toFixed(1) + '%';
                 },
 
-                async suggestCode(force) {
+                /**
+                 * Fill the short code (from the category) and the SKU (from category + brand).
+                 * Automatic calls only replace values the user has not typed themselves.
+                 */
+                async suggestCodes(force) {
                     if (!this.categoryId) return;
-                    const response = await fetch(this.nextCodeUrl + '?category_id=' + encodeURIComponent(this.categoryId), { headers: { Accept: 'application/json' } });
+                    const query = new URLSearchParams({ category_id: this.categoryId, brand_id: this.brandId || '' });
+                    const response = await fetch(this.nextCodeUrl + '?' + query, { headers: { Accept: 'application/json' } });
                     if (!response.ok) return;
                     const data = await response.json();
                     this.rangeHint = data.range ? `Category range ${data.range[0]}–${data.range[1]}.` : 'This category has no code range.';
-                    // Only replace a code the user has not typed themselves.
                     if (data.code && (force || (this.isNew && (!this.code || this.code === this.autoCode)))) {
                         this.code = data.code;
                         this.autoCode = data.code;
+                    }
+                    if (data.sku && (force || (this.isNew && (!this.sku || this.sku === this.autoSku)))) {
+                        this.sku = data.sku;
+                        this.autoSku = data.sku;
                     }
                 },
             };

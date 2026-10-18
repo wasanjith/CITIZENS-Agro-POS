@@ -16,6 +16,7 @@
         <x-ui.card>
             <div class="space-y-4">
                 <x-ui.input name="name" label="Name" :value="$brand->name" required />
+                <x-ui.select name="supplier_id" label="Supplier" :options="$suppliers" :value="$brand->supplier_id" placeholder="Choose…" required hint="A brand is bought from one supplier. Its products are suggested on that supplier's purchase orders." />
                 <x-ui.checkbox name="is_active" label="Active" :checked="$brand->is_active" />
             </div>
 

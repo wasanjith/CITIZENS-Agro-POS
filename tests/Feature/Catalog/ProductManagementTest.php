@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Catalog\Import\ProductsExport;
+use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
@@ -162,6 +163,34 @@ test('the next short code follows the category range, also for sub-categories', 
     $this->actingAs($this->owner)
         ->getJson(route('catalog.products.next-code', ['category_id' => $this->fertilizers->id]))
         ->assertJson(['code' => '1000']);
+});
+
+test('the next sku follows the category and brand, also counting deleted products', function () {
+    $brand = Brand::factory()->create(['name' => 'Bathalagoda Agro']);
+    createProduct(['sku' => 'FER-BAT-001', 'category' => 'Fertilizers', 'brand_id' => $brand->id]);
+    createProduct(['sku' => 'FER-BAT-002', 'category' => 'Fertilizers', 'brand_id' => $brand->id])->delete();
+    createProduct(['sku' => 'FER-BAT-SPECIAL', 'category' => 'Fertilizers']);
+
+    $this->actingAs($this->owner)
+        ->getJson(route('catalog.products.next-code', ['category_id' => $this->fertilizers->id, 'brand_id' => $brand->id]))
+        ->assertOk()
+        ->assertJson(['code' => '1000', 'sku' => 'FER-BAT-003']);
+
+    $this->actingAs($this->owner)
+        ->getJson(route('catalog.products.next-code', ['category_id' => $this->fertilizers->id]))
+        ->assertJson(['sku' => 'FER-001']);
+
+    $this->actingAs($this->owner)
+        ->getJson(route('catalog.products.next-code', ['category_id' => Category::firstWhere('name', 'Agro-chemicals')->id, 'brand_id' => $brand->id]))
+        ->assertJson(['sku' => 'AGR-BAT-001']);
+});
+
+test('the add product form pre-fills short code and sku when a category is given', function () {
+    $this->actingAs($this->owner)
+        ->get(route('catalog.products.create', ['category_id' => $this->fertilizers->id]))
+        ->assertOk()
+        ->assertSee('1000')
+        ->assertSee('FER-001');
 });
 
 test('deleted products keep their code reserved', function () {

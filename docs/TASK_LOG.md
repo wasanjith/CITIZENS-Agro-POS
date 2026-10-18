@@ -10,8 +10,8 @@
 | Item | Status |
 |---|---|
 | **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
-| **Last updated** | 2026-10-16 |
-| **Tests** | 492 Pest tests at the last full run (2026-10-09) + 20 new. 2026-10-16: Inventory + Purchasing + Catalog (183, 8 new) and Search (16) pass when run separately; the full suite was not re-run. |
+| **Last updated** | 2026-10-17 |
+| **Tests** | 537 Pest tests, all pass (full run 2026-10-17, 3,390 assertions, ~4.5 min). |
 | **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
 | **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
 | **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
@@ -101,6 +101,12 @@
 ## Log
 
 Newest first.
+
+### 2026-10-17: Shorter Add product form, automatic short code + SKU
+- **Catalog → Products → Add/Edit, General tab** rearranged into a 3-column grid (was 2 columns, 12 rows): Name (English) first (cursor starts there), then Category · Brand · Base unit, then Short code · SKU · Tax, then Sold loose · Can be opened into · Loose quantity, then Description (2 rows) · Active. Hints shortened. "Can be opened into" hides for loose products (unless already set) and "Loose quantity in one pack" shows only once an opened-into product is chosen.
+- **Automatic SKU:** choosing a category and/or brand fills the short code (as before) **and** the SKU: first 3 letters of the category + brand + next free number, e.g. `FER-BAT-001` (Fertilizers, Bathalagoda Agro), `FER-001` with no brand. Deleted products' SKUs are counted, so they are not reused. Like the short code, automatic filling only replaces a value the user hasn't typed, and only on new products; **Suggest** refills both (also on Edit). Names with no Latin letters fall back to the id (`C12`, `B3`).
+- Files: new `Catalog/Services/SkuGenerator`, `ProductController` (`create` pre-fills the SKU, `nextCode` takes `brand_id` and returns `sku`), `catalog/products/form.blade.php`, `USER_GUIDE.md` § 6.2.
+- Tests: 2 new in `ProductManagementTest`; full suite 537 pass. PHPStan on the changed files: 0 errors; Pint clean. No CSS/JS build needed (Blade + inline Alpine only).
 
 ### 2026-10-16: Full hardware shopping list for hosting
 - **DEPLOYMENT.md § 3** rewritten as a full bill of materials with the capacity to ask for: at-a-glance table + what sits where, computers (server summary, counter business mini PCs), monitors/keyboards, 80 mm printers (speed, cutter, head life, Windows + Linux driver) and paper use (~1 × 80 m roll a day), network (8-port gigabit easy-smart switch, **Cat6 23 AWG solid copper, no CCA**, patch panel, wall jacks, factory patch cords, 6U wall cabinet, router/Wi-Fi), power (UPS A 1500 VA/900 W **pure sine wave** with load table ≈ 110 W normal / 255 W peak, UPS B 650–850 VA per counter, earth check, Type 2 surge protector, dedicated 13 A circuit), furniture, spares/tools, not needed.

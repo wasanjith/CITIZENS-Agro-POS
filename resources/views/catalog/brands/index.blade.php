@@ -7,7 +7,7 @@
         <x-ui.button :href="route('catalog.brands.create')">Add brand</x-ui.button>
     </x-ui.page-header>
 
-    <x-ui.filter-bar :action="route('catalog.brands.index')" placeholder="Search brands" class="mb-4" />
+    <x-ui.filter-bar :action="route('catalog.brands.index')" placeholder="Search brand or supplier" class="mb-4" />
 
     @if ($brands->isEmpty())
         <x-ui.empty-state title="No brands found" />
@@ -15,6 +15,7 @@
         <x-ui.table>
             <x-slot:head>
                 <x-ui.th-sortable column="name" default="name">Brand</x-ui.th-sortable>
+                <th>Supplier</th>
                 <x-ui.th-sortable column="products_count" default="name" class="text-right">Products</x-ui.th-sortable>
                 <th>Status</th>
                 <th><span class="sr-only">Actions</span></th>
@@ -23,6 +24,17 @@
             @foreach ($brands as $brand)
                 <tr>
                     <td class="font-medium">{{ $brand->name }}</td>
+                    <td>
+                        @if ($brand->supplier)
+                            @can('view', $brand->supplier)
+                                <a href="{{ route('purchasing.suppliers.show', $brand->supplier) }}" class="text-brand-700 hover:underline">{{ $brand->supplier->name }}</a>
+                            @else
+                                {{ $brand->supplier->name }}
+                            @endcan
+                        @else
+                            <span class="text-amber-700">No supplier</span>
+                        @endif
+                    </td>
                     <td class="text-right tabular">
                         <a href="{{ route('catalog.products.index', ['filter' => ['brand' => $brand->id]]) }}" class="text-brand-700 hover:underline">{{ $brand->products_count }}</a>
                     </td>

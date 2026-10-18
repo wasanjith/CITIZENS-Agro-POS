@@ -13,6 +13,7 @@ use App\Domain\Catalog\Models\Tax;
 use App\Domain\Catalog\Models\Unit;
 use App\Domain\Catalog\Services\PriceBook;
 use App\Domain\Catalog\Services\ShortCodeGenerator;
+use App\Domain\Catalog\Services\SkuGenerator;
 use App\Domain\Inventory\Models\StockLevel;
 use App\Domain\Inventory\Models\StockMovement;
 use App\Domain\Inventory\Services\StockAlerts;
@@ -123,7 +124,7 @@ class ProductController extends Controller
         ]);
     }
 
-    public function create(Request $request, ShortCodeGenerator $codes): View
+    public function create(Request $request, ShortCodeGenerator $codes, SkuGenerator $skus): View
     {
         $this->authorize('create', Product::class);
 
@@ -133,6 +134,7 @@ class ProductController extends Controller
             'is_active' => true,
             'category_id' => $category?->id,
             'short_code' => $category ? $codes->next($category) : null,
+            'sku' => $category ? $skus->next($category) : null,
             'reorder_level' => 0,
             'reorder_qty' => 0,
         ]);
@@ -176,17 +178,19 @@ class ProductController extends Controller
     }
 
     /**
-     * Suggest the next free short code for a category (used by the product form).
+     * Suggest the next free short code for a category, and the next SKU for the category + brand (used by the product form).
      */
-    public function nextCode(Request $request, ShortCodeGenerator $codes): JsonResponse
+    public function nextCode(Request $request, ShortCodeGenerator $codes, SkuGenerator $skus): JsonResponse
     {
         $this->authorize('create', Product::class);
 
         $category = Category::find($request->integer('category_id'));
+        $brand = Brand::find($request->integer('brand_id'));
 
         return response()->json([
             'code' => $codes->next($category),
             'range' => $category?->codeRange(),
+            'sku' => $category ? $skus->next($category, $brand) : null,
         ]);
     }
 

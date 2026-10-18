@@ -2,6 +2,7 @@
 
 namespace App\Domain\Purchasing\Models;
 
+use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Inventory\Support\StockReference;
 use App\Domain\Purchasing\Enums\GoodsReceiptStatus;
@@ -118,6 +119,16 @@ class Supplier extends Model implements StockReference
         }
 
         return $digits;
+    }
+
+    /**
+     * Brands bought from this supplier.
+     *
+     * @return HasMany<Brand, $this>
+     */
+    public function brands(): HasMany
+    {
+        return $this->hasMany(Brand::class);
     }
 
     /**
